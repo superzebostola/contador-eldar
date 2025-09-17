@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: contador-eldar
+    env: docker
+    plan: free
+    autoDeploy: true

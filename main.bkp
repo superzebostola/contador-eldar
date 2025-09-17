@@ -47,7 +47,7 @@ async def on_message(message):
         return
 
     pattern = r"<@!?(\d+)>\s+tk"
-    matches = re.findall(pattern, message.content)
+    matches = re.findall(pattern, message.content, flags=re.IGNORECASE)
 
     for user_id_str in matches:
         user_id = int(user_id_str)

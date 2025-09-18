@@ -6,7 +6,6 @@ import re
 import json
 import os
 import io
-from datetime import datetime
 
 # Google Drive API
 from google.oauth2 import service_account
@@ -89,17 +88,9 @@ def save_data():
     except Exception as e:
         print(f"⚠️ Erro ao salvar no Drive: {e}")
 
-# ---------------- Sistema de Logs ----------------
-def log_action(texto: str, user: discord.User | discord.Member = None, admin: bool = False):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    if admin and user:
-        linha = f"[{timestamp}] ADMIN {get_display_name(user)} ({user.id}) {texto}"
-    else:
-        linha = f"[{timestamp}] {texto}"
-
+def log_action(texto: str):
     with open(LOGS_FILE, "a", encoding="utf-8") as f:
-        f.write(f"{linha}\n")
-
+        f.write(f"{texto}\n")
     try:
         upload_logs(LOGS_FILE)
     except Exception as e:
@@ -134,7 +125,7 @@ async def on_message(message):
         await message.channel.send(
             f"🔢 {get_display_name(user)} já cometeu {user_counters[str(user_id)]} teamkills!"
         )
-        log_action(f"TK: {get_display_name(user)} ({user_id}) → total: {user_counters[str(user_id)]}")
+        log_action(f"[TK] {get_display_name(user)} ({user_id}) → total: {user_counters[str(user_id)]}")
 
     await bot.process_commands(message)
 
@@ -171,6 +162,102 @@ async def help_command(interaction: discord.Interaction):
 
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
+# ---------------- COMANDOS ----------------
+@bot.tree.command(name="contador", description="Veja quantos teamkills um usuário cometeu.")
+@app_commands.describe(usuario="Usuário que você quer ver o contador")
+async def contador(interaction: discord.Interaction, usuario: discord.User):
+    count = user_counters.get(str(usuario.id), 0)
+    await interaction.response.send_message(
+        f"📊 {get_display_name(usuario)} tem atualmente {count} teamkill(s)."
+    )
+
+@bot.tree.command(name="meucontador", description="Veja quantos teamkills você já cometeu.")
+async def meucontador(interaction: discord.Interaction):
+    count = user_counters.get(str(interaction.user.id), 0)
+    await interaction.response.send_message(
+        f"🙋 {get_display_name(interaction.user)}, você tem atualmente {count} tk(s)."
+    )
+
+@bot.tree.command(name="top", description="Mostra o ranking de usuários com mais teamkills do esquadrão.")
+async def top(interaction: discord.Interaction):
+    if not user_counters:
+        await interaction.response.send_message("❌ Ainda não há contadores registrados.")
+        return
+
+    ranking = sorted(user_counters.items(), key=lambda x: x[1], reverse=True)
+    top_text = "🏆 **Ranking de Teamkills ELDAR**:\n\n"
+
+    for i, (user_id, count) in enumerate(ranking[:10], start=1):
+        user = bot.get_user(int(user_id)) or await bot.fetch_user(int(user_id))
+        top_text += f"**{i}.** {get_display_name(user)} — {count} teamkill(s)\n"
+
+    await interaction.response.send_message(top_text)
+
+# ---------------- ADM COMANDOS ----------------
+@bot.tree.command(name="zerar", description="Reseta o contador de um usuário (apenas admins).")
+@app_commands.describe(usuario="Usuário que você quer resetar")
+@app_commands.default_permissions(administrator=True)
+async def zerar(interaction: discord.Interaction, usuario: discord.User):
+    user_counters[str(usuario.id)] = 0
+    save_data()
+    log_action(f"[ZERAR] {get_display_name(interaction.user)} resetou o contador de {get_display_name(usuario)} ({usuario.id})")
+    await interaction.response.send_message(f"🔄 O contador de {get_display_name(usuario)} foi resetado para 0.")
+
+@bot.tree.command(name="remover", description="Diminui em 1 o contador de um usuário (apenas admins).")
+@app_commands.describe(usuario="Usuário que você quer diminuir o contador")
+@app_commands.default_permissions(administrator=True)
+async def remover(interaction: discord.Interaction, usuario: discord.User):
+    user_id = str(usuario.id)
+    if user_id in user_counters and user_counters[user_id] > 0:
+        user_counters[user_id] -= 1
+        save_data()
+        log_action(f"[REMOVER] {get_display_name(interaction.user)} diminuiu o contador de {get_display_name(usuario)} ({usuario.id}) → {user_counters[user_id]}")
+        await interaction.response.send_message(f"➖ O contador de {get_display_name(usuario)} foi diminuído para {user_counters[user_id]}.")
+    else:
+        await interaction.response.send_message(f"⚠️ O contador de {get_display_name(usuario)} já está em 0 e não pode ser diminuído.")
+
+@bot.tree.command(name="backup", description="Envia o arquivo data.json (apenas admins).")
+@app_commands.default_permissions(administrator=True)
+async def backup(interaction: discord.Interaction):
+    try:
+        download_file(DATA_FILE)
+        log_action(f"[BACKUP] {get_display_name(interaction.user)} exportou o data.json")
+        await interaction.response.send_message("📂 Aqui está o backup do arquivo `data.json`:", file=discord.File(DATA_FILE))
+    except Exception as e:
+        await interaction.response.send_message(f"⚠️ Erro ao gerar backup: {e}", ephemeral=True)
+
+@bot.tree.command(name="restaurar", description="Restaura o data.json a partir de um arquivo enviado (apenas admins).")
+@app_commands.default_permissions(administrator=True)
+async def restaurar(interaction: discord.Interaction, arquivo: discord.Attachment):
+    if not arquivo.filename.endswith(".json"):
+        await interaction.response.send_message("⚠️ Envie um arquivo `.json` válido.", ephemeral=True)
+        return
+
+    class ConfirmarView(discord.ui.View):
+        def __init__(self):
+            super().__init__(timeout=30)
+
+        @discord.ui.button(label="✅ Confirmar", style=discord.ButtonStyle.green)
+        async def confirmar(self, interaction_btn: discord.Interaction, button: discord.ui.Button):
+            try:
+                file_bytes = await arquivo.read()
+                with open(DATA_FILE, "wb") as f:
+                    f.write(file_bytes)
+                global user_counters
+                with open(DATA_FILE, "r") as f:
+                    user_counters = json.load(f)
+                save_data()
+                log_action(f"[RESTAURAR] {get_display_name(interaction.user)} restaurou o data.json com um novo arquivo")
+                await interaction_btn.response.edit_message(content="♻️ O arquivo `data.json` foi restaurado com sucesso!", view=None)
+            except Exception as e:
+                await interaction_btn.response.edit_message(content=f"⚠️ Erro ao restaurar: {e}", view=None)
+
+        @discord.ui.button(label="❌ Cancelar", style=discord.ButtonStyle.red)
+        async def cancelar(self, interaction_btn: discord.Interaction, button: discord.ui.Button):
+            await interaction_btn.response.edit_message(content="❌ Restauração cancelada.", view=None)
+
+    await interaction.response.send_message("⚠️ Tem certeza que deseja **sobrescrever** o arquivo `data.json`?", view=ConfirmarView(), ephemeral=True)
+
 # ---------------- LOGS ----------------
 @bot.tree.command(name="logs", description="Mostra os últimos registros (apenas admins).")
 @app_commands.default_permissions(administrator=True)
@@ -182,6 +269,7 @@ async def logs(interaction: discord.Interaction):
         with open(LOGS_FILE, "r", encoding="utf-8") as f:
             linhas = f.readlines()[-10:]
         texto = "".join(linhas) if linhas else "⚠️ Nenhum log registrado."
+        log_action(f"[LOGS] {get_display_name(interaction.user)} consultou os últimos registros")
         await interaction.response.send_message(f"📜 **Últimos registros:**\n```\n{texto}\n```", ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"⚠️ Erro ao carregar logs: {e}", ephemeral=True)
@@ -194,6 +282,7 @@ async def exportlogs(interaction: discord.Interaction):
         return
     try:
         download_logs(LOGS_FILE)
+        log_action(f"[EXPORTLOGS] {get_display_name(interaction.user)} exportou o arquivo logs.txt")
         await interaction.response.send_message("📤 Aqui está o arquivo `logs.txt`:", file=discord.File(LOGS_FILE), ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"⚠️ Erro ao exportar logs: {e}", ephemeral=True)
@@ -205,3 +294,4 @@ if bot_token:
     bot.run(bot_token)
 else:
     print("❌ DISCORD_BOT_TOKEN não encontrado nas variáveis de ambiente.")
+

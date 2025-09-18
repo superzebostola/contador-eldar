@@ -110,6 +110,24 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
+# HELP - lista todos os comandos
+# ----------------------------------------
+@bot.tree.command(name="help", description="Mostra todos os comandos disponíveis.")
+async def help_command(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="📖 Lista de Comandos",
+        description="Aqui estão os comandos disponíveis para o bot:",
+        color=discord.Color.blue()
+    )
+
+    embed.add_field(name="/contador [usuário]", value="📊 Mostra quantos teamkills um usuário já cometeu.", inline=False)
+    embed.add_field(name="/meucontador", value="🙋 Mostra quantos teamkills você mesmo já cometeu.", inline=False)
+    embed.add_field(name="/top", value="🏆 Mostra o ranking dos 10 usuários com mais teamkills.", inline=False)
+    embed.add_field(name="/zerar [usuário] (admin)", value="🔄 Zera o contador de um usuário.", inline=False)
+    embed.add_field(name="/remover [usuário] (admin)", value="➖ Diminui em 1 o contador de um usuário.", inline=False)
+
+    await interaction.response.send_message(embed=embed)
+
 # ---------------- Comandos de barra ----------------
 
 @bot.tree.command(name="contador", description="Veja quantos teamkills um usuário cometeu.")
@@ -142,10 +160,10 @@ async def top(interaction: discord.Interaction):
 
     await interaction.response.send_message(top_text)
 
-@bot.tree.command(name="reset", description="Reseta o contador de um usuário (apenas admins).")
+@bot.tree.command(name="zerar", description="Reseta o contador de um usuário (apenas admins).")
 @app_commands.describe(usuario="Usuário que você quer resetar")
 @app_commands.default_permissions(administrator=True)
-async def reset(interaction: discord.Interaction, usuario: discord.User):
+async def zerar(interaction: discord.Interaction, usuario: discord.User):
     if not isinstance(interaction.user, discord.Member) or not interaction.user.guild_permissions.administrator:
         await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
         return
@@ -153,6 +171,22 @@ async def reset(interaction: discord.Interaction, usuario: discord.User):
     user_counters[str(usuario.id)] = 0
     save_data()
     await interaction.response.send_message(f"🔄 O contador de {usuario.mention} foi resetado para 0.")
+
+@bot.tree.command(name="remover", description="Diminui em 1 o contador de um usuário (apenas admins).")
+@app_commands.describe(usuario="Usuário que você quer diminuir o contador")
+@app_commands.default_permissions(administrator=True)
+async def remover(interaction: discord.Interaction, usuario: discord.User):
+    if not isinstance(interaction.user, discord.Member) or not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
+        return
+
+    user_id = str(usuario.id)
+    if user_id in user_counters and user_counters[user_id] > 0:
+        user_counters[user_id] -= 1
+        save_data()
+        await interaction.response.send_message(f"➖ O contador de {usuario.mention} foi diminuído para {user_counters[user_id]}.")
+    else:
+        await interaction.response.send_message(f"⚠️ O contador de {usuario.mention} já está em 0 e não pode ser diminuído.")
 
 # ----------------------------------------------------
 

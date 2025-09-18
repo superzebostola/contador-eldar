@@ -150,15 +150,7 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-# ---------------- BACKUP AUTOMÁTICO ----------------
-@tasks.loop(minutes=15)
-async def backup_drive():
-    try:
-        upload_file(DATA_FILE)
-        upload_logs(LOGS_FILE)
-        print("☁️ Backup automático de data.json e logs.txt enviado para o Google Drive")
-    except Exception as e:
-        print(f"⚠️ Erro no backup automático: {e}")
+
 
 # ---------------- HELP ----------------
 @bot.tree.command(name="help", description="Mostra todos os comandos disponíveis.")
@@ -309,6 +301,28 @@ async def exportlogs(interaction: discord.Interaction):
         await interaction.response.send_message("📤 Aqui está o arquivo `logs.txt`:", file=discord.File(LOGS_FILE), ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"⚠️ Erro ao exportar logs: {e}", ephemeral=True)
+
+# ---------------- BACKUP AUTOMÁTICO ----------------
+@tasks.loop(minutes=15)
+async def backup_drive():
+    try:
+        # Só faz backup do data.json se tiver dados
+        if user_counters and os.path.exists(DATA_FILE) and os.path.getsize(DATA_FILE) > 2:
+            upload_file(DATA_FILE)
+            print("☁️ Backup do data.json enviado para o Google Drive")
+        else:
+            print("⚠️ Backup do data.json ignorado (vazio ou inexistente)")
+
+        # Só faz backup do logs.txt se tiver conteúdo
+        if os.path.exists(LOGS_FILE) and os.path.getsize(LOGS_FILE) > 0:
+            upload_logs(LOGS_FILE)
+            print("☁️ Backup do logs.txt enviado para o Google Drive")
+        else:
+            print("⚠️ Backup do logs.txt ignorado (vazio ou inexistente)")
+
+    except Exception as e:
+        print(f"⚠️ Erro no backup automático: {e}")
+
 
 # ---------------- BOT TOKEN ----------------
 bot_token = os.getenv("DISCORD_BOT_TOKEN")

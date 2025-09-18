@@ -215,6 +215,88 @@ async def remover(interaction: discord.Interaction, usuario: discord.User):
     else:
         await interaction.response.send_message(f"⚠️ O contador de {usuario.mention} já está em 0 e não pode ser diminuído.")
 
+# ---------------- BACKUP ----------------
+@bot.tree.command(name="backup", description="Envia o arquivo data.json (apenas admins).")
+@app_commands.default_permissions(administrator=True)
+async def backup(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message(
+            "❌ Você não tem permissão para usar este comando.",
+            ephemeral=True
+        )
+        return
+
+    try:
+        # Garante que baixa a versão mais recente antes de enviar
+        download_file(DATA_FILE)
+
+        await interaction.response.send_message(
+            "📂 Aqui está o backup do arquivo `data.json`:",
+            file=discord.File(DATA_FILE)
+        )
+    except Exception as e:
+        await interaction.response.send_message(f"⚠️ Erro ao gerar backup: {e}", ephemeral=True)
+
+# ---------------- RESTAURAR ----------------
+@bot.tree.command(name="restaurar", description="Restaura o data.json a partir de um arquivo enviado (apenas admins).")
+@app_commands.default_permissions(administrator=True)
+async def restaurar(interaction: discord.Interaction, arquivo: discord.Attachment):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message(
+            "❌ Você não tem permissão para usar este comando.",
+            ephemeral=True
+        )
+        return
+
+    if not arquivo.filename.endswith(".json"):
+        await interaction.response.send_message(
+            "⚠️ Envie um arquivo `.json` válido.",
+            ephemeral=True
+        )
+        return
+
+    # Cria botões de confirmação
+    class ConfirmarView(discord.ui.View):
+        def __init__(self):
+            super().__init__(timeout=30)
+
+        @discord.ui.button(label="✅ Confirmar", style=discord.ButtonStyle.green)
+        async def confirmar(self, interaction_btn: discord.Interaction, button: discord.ui.Button):
+            try:
+                file_bytes = await arquivo.read()
+                with open(DATA_FILE, "wb") as f:
+                    f.write(file_bytes)
+
+                # Atualiza os dados em memória
+                global user_counters
+                with open(DATA_FILE, "r") as f:
+                    user_counters = json.load(f)
+                save_data()
+
+                await interaction_btn.response.edit_message(
+                    content="♻️ O arquivo `data.json` foi restaurado com sucesso!",
+                    view=None
+                )
+            except Exception as e:
+                await interaction_btn.response.edit_message(
+                    content=f"⚠️ Erro ao restaurar: {e}",
+                    view=None
+                )
+
+        @discord.ui.button(label="❌ Cancelar", style=discord.ButtonStyle.red)
+        async def cancelar(self, interaction_btn: discord.Interaction, button: discord.ui.Button):
+            await interaction_btn.response.edit_message(
+                content="❌ Restauração cancelada.",
+                view=None
+            )
+
+    await interaction.response.send_message(
+        "⚠️ Tem certeza que deseja **sobrescrever** o arquivo `data.json`?",
+        view=ConfirmarView(),
+        ephemeral=True
+    )
+
+
 # ----------------------------------------------------
 
 bot_token = os.getenv("DISCORD_BOT_TOKEN")

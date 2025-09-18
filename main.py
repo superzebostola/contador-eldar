@@ -107,25 +107,28 @@ def log_action(texto: str):
 
 # ---------------- BOT EVENTS ----------------
 @bot.event
+@bot.event
 async def on_ready():
     global user_counters
     user_counters = load_data()
     print(f"✅ Bot conectado como {bot.user}")
 
     try:
-        # 🔄 Primeiro faz sync global (pode demorar até 1h para refletir)
-        synced_global = await bot.tree.sync()
-        print(f"🌍 {len(synced_global)} comandos sincronizados globalmente")
+        guild_ids = [432367752418820137, 123456789012345678]  # substitua pelos seus IDs
+        for gid in guild_ids:
+            guild = discord.Object(id=gid)
+            synced = await bot.tree.sync(guild=guild)
+            print(f"✅ {len(synced)} comandos sincronizados com a guild {gid}")
 
-        # 🔄 Depois sincroniza imediatamente para cada guild atual
-        for guild in bot.guilds:
-            synced_guild = await bot.tree.sync(guild=guild)
-            print(f"🏠 {len(synced_guild)} comandos sincronizados com a guild {guild.name} ({guild.id})")
+        # opcional: também registrar global
+        # synced_global = await bot.tree.sync()
+        # print(f"🌍 {len(synced_global)} comandos globais sincronizados")
 
     except Exception as e:
         print(f"⚠️ Erro ao sincronizar comandos: {e}")
 
     backup_drive.start()
+
 
 
 @bot.event

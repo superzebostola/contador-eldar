@@ -1,4 +1,5 @@
 import discord
+from discord import app_commands
 from discord.ext import tasks, commands
 from discord import app_commands
 from keep_alive import keep_alive
@@ -6,6 +7,7 @@ import re
 import json
 import os
 import io
+
 
 # Google Drive API
 from google.oauth2 import service_account
@@ -109,14 +111,22 @@ async def on_ready():
     global user_counters
     user_counters = load_data()
     print(f"✅ Bot conectado como {bot.user}")
+
     try:
-        GUILD_ID = 432367752418820137
-        guild = discord.Object(id=GUILD_ID)
-        synced = await bot.tree.sync(guild=guild)
-        print(f"✅ {len(synced)} comandos sincronizados com a guild {GUILD_ID}")
+        # 🔄 Primeiro faz sync global (pode demorar até 1h para refletir)
+        synced_global = await bot.tree.sync()
+        print(f"🌍 {len(synced_global)} comandos sincronizados globalmente")
+
+        # 🔄 Depois sincroniza imediatamente para cada guild atual
+        for guild in bot.guilds:
+            synced_guild = await bot.tree.sync(guild=guild)
+            print(f"🏠 {len(synced_guild)} comandos sincronizados com a guild {guild.name} ({guild.id})")
+
     except Exception as e:
         print(f"⚠️ Erro ao sincronizar comandos: {e}")
+
     backup_drive.start()
+
 
 @bot.event
 async def on_message(message):
@@ -312,24 +322,26 @@ async def backup_drive():
 # =========================
 # 🔄 Comando para resincronizar comandos na guilda (ADMIN)
 # =========================
-from discord import app_commands
 
 @app_commands.default_permissions(administrator=True)
-@bot.tree.command(name="resync", description="(ADM) Limpa e resincroniza os comandos desta guilda.")
+@bot.tree.command(name="resync", description="(ADM) Limpa e resincroniza os comandos desta guilda e globalmente.")
 async def resync(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     try:
-        guild = interaction.guild
-        # Remove todos os comandos antigos registrados nesta guilda
-        await bot.tree.clear_commands(guild=guild)
-        # Sincroniza os comandos atuais definidos no código
-        synced = await bot.tree.sync(guild=guild)
-        await interaction.followup.send(
-            f"✅ Comandos limpos e sincronizados nesta guilda. ({len(synced)} comandos encontrados)",
-            ephemeral=True
-        )
+        # 🔄 Sincroniza global
+        synced_global = await bot.tree.sync()
+        msg = [f"🌍 {len(synced_global)} comandos sincronizados globalmente"]
+
+        # 🔄 Sincroniza para cada guild atual
+        for guild in bot.guilds:
+            synced_guild = await bot.tree.sync(guild=guild)
+            msg.append(f"🏠 {len(synced_guild)} comandos sincronizados com {guild.name} ({guild.id})")
+
+        await interaction.followup.send("\n".join(msg), ephemeral=True)
+
     except Exception as e:
         await interaction.followup.send(f"❌ Erro ao resincronizar: {e}", ephemeral=True)
+
 
 
 # ---------------- BOT TOKEN ----------------

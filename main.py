@@ -309,6 +309,29 @@ async def backup_drive():
     except Exception as e:
         print(f"⚠️ Erro no backup automático: {e}")
 
+# =========================
+# 🔄 Comando para resincronizar comandos na guilda (ADMIN)
+# =========================
+from discord import app_commands
+
+@app_commands.default_permissions(administrator=True)
+@bot.tree.command(name="resync", description="(ADM) Limpa e resincroniza os comandos desta guilda.")
+async def resync(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    try:
+        guild = interaction.guild
+        # Remove todos os comandos antigos registrados nesta guilda
+        await bot.tree.clear_commands(guild=guild)
+        # Sincroniza os comandos atuais definidos no código
+        synced = await bot.tree.sync(guild=guild)
+        await interaction.followup.send(
+            f"✅ Comandos limpos e sincronizados nesta guilda. ({len(synced)} comandos encontrados)",
+            ephemeral=True
+        )
+    except Exception as e:
+        await interaction.followup.send(f"❌ Erro ao resincronizar: {e}", ephemeral=True)
+
+
 # ---------------- BOT TOKEN ----------------
 bot_token = os.getenv("DISCORD_BOT_TOKEN")
 if bot_token:

@@ -26,27 +26,7 @@ user_counters = {}
 
 
 
-# ---------------- Funções de salvar/carregar ----------------
-def load_data():
-    try:
-        download_file(DATA_FILE)
-        with open(DATA_FILE, "r") as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        print("⚠️ Arquivo data.json inválido. Criando novo.")
-        return {}
-    except Exception as e:
-        print(f"⚠️ Erro ao carregar dados do Drive: {e}")
-        return {}
 
-
-def save_data():
-    with open(DATA_FILE, "w") as f:
-        json.dump(user_counters, f, indent=4)
-    try:
-        upload_file(DATA_FILE)
-    except Exception as e:
-        print(f"⚠️ Erro ao salvar no Drive: {e}")
 # -------------------------------------------------------------
 
 @bot.event
@@ -306,7 +286,27 @@ async def restaurar(interaction: discord.Interaction, arquivo: discord.Attachmen
         ephemeral=True
     )
 
+# ---------------- Funções de salvar/carregar ----------------
+def load_data():
+    try:
+        download_file(DATA_FILE)
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        print("⚠️ Arquivo data.json inválido. Criando novo.")
+        return {}
+    except Exception as e:
+        print(f"⚠️ Erro ao carregar dados do Drive: {e}")
+        return {}
 
+
+def save_data():
+    with open(DATA_FILE, "w") as f:
+        json.dump(user_counters, f, indent=4)
+    try:
+        upload_file(DATA_FILE)
+    except Exception as e:
+        print(f"⚠️ Erro ao salvar no Drive: {e}")
 # ----------------------------------------------------
 
 bot_token = os.getenv("DISCORD_BOT_TOKEN")

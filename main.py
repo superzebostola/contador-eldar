@@ -8,6 +8,15 @@ import os
 import io
 import traceback
 
+#intents
+intents = discord.Intents.default()
+intents.message_content = True  # necessário para ler mensagens normais
+intents.guilds = True            # necessário para slash commands
+intents.members = True           # se você usa ranking/top baseado em membros
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+
 # Google Drive API
 from google.oauth2 import service_account
 from googleapiclient.discovery import build

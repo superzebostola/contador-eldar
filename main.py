@@ -71,7 +71,7 @@ async def on_message(message):
     f"🔢 {get_display_name(user)} já cometeu {user_counters[str(user_id)]} teamkills! Escola Lozenilson de TK está orgulhosa!"
 )
 
-        )
+        
 
     await bot.process_commands(message)
 

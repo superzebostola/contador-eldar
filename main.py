@@ -137,8 +137,9 @@ async def on_message(message):
 
 # ---------------- HELP ----------------
 @bot.tree.command(name="ajuda", description="Mostra todos os comandos disponíveis.")
-async def help_command(interaction: discord.Interaction):
+async def ajuda_command(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
+
     embed = discord.Embed(
         title="📖 Lista de Comandos",
         description="Aqui estão os comandos disponíveis para o bot:",
@@ -147,6 +148,7 @@ async def help_command(interaction: discord.Interaction):
     embed.add_field(name="/contador [usuário]", value="📊 Mostra quantos teamkills um usuário já cometeu.", inline=False)
     embed.add_field(name="/meucontador", value="🙋 Mostra quantos teamkills você mesmo já cometeu.", inline=False)
     embed.add_field(name="/top", value="🏆 Mostra o ranking dos 10 usuários com mais teamkills.", inline=False)
+
     if interaction.user.guild_permissions.administrator:
         embed.add_field(name="/zerar [usuário]", value="🔄 Zera o contador de um usuário.", inline=False)
         embed.add_field(name="/remover [usuário]", value="➖ Diminui em 1 o contador de um usuário.", inline=False)
@@ -154,7 +156,9 @@ async def help_command(interaction: discord.Interaction):
         embed.add_field(name="/restaurar", value="♻️ Restaura o `data.json` a partir de um upload.", inline=False)
         embed.add_field(name="/logs", value="📜 Mostra os últimos registros de alterações.", inline=False)
         embed.add_field(name="/exportlogs", value="📤 Exporta todo o arquivo `logs.txt`.", inline=False)
+
     await interaction.followup.send(embed=embed, ephemeral=True)
+
 
 # ---------------- COMANDOS ----------------
 @bot.tree.command(name="contador", description="Veja quantos teamkills um usuário cometeu.")

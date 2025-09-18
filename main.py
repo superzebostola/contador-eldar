@@ -23,37 +23,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 DATA_FILE = "data.json"
 user_counters = {}
 
-# ---------------- Google Drive Config ----------------
-GOOGLE_CREDENTIALS = os.getenv("GOOGLE_CREDENTIALS")
-DRIVE_FILE_ID = os.getenv("DRIVE_FILE_ID")
 
-if not GOOGLE_CREDENTIALS or not DRIVE_FILE_ID:
-    print("❌ Faltando variáveis de ambiente GOOGLE_CREDENTIALS ou DRIVE_FILE_ID")
-    exit(1)
-
-creds = service_account.Credentials.from_service_account_info(
-    json.loads(GOOGLE_CREDENTIALS),
-    scopes=["https://www.googleapis.com/auth/drive.file"]
-)
-drive_service = build("drive", "v3", credentials=creds)
-
-def upload_file(local_path=DATA_FILE):
-    """Envia o arquivo local para o Google Drive"""
-    media = MediaFileUpload(local_path, mimetype="application/json", resumable=True)
-    drive_service.files().update(
-        fileId=DRIVE_FILE_ID,
-        media_body=media
-    ).execute()
-
-def download_file(local_path=DATA_FILE):
-    """Baixa o arquivo do Google Drive"""
-    request = drive_service.files().get_media(fileId=DRIVE_FILE_ID)
-    fh = io.FileIO(local_path, "wb")
-    downloader = MediaIoBaseDownload(fh, request)
-    done = False
-    while not done:
-        status, done = downloader.next_chunk()
-# -----------------------------------------------------
 
 # ---------------- Funções de salvar/carregar ----------------
 def load_data():
@@ -110,6 +80,62 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
+
+#---------- upload do datajson------------
+@tasks.loop(minutes=15)
+async def backup_drive():
+    try:
+        upload_file(DATA_FILE)
+        print("☁️ Backup do data.json enviado para o Google Drive")
+    except Exception as e:
+        print(f"⚠️ Erro no backup automático: {e}")
+
+@bot.event
+async def on_ready():
+    global user_counters
+    user_counters = load_data()
+    print(f"✅ Bot conectado como {bot.user}")
+    try:
+        synced = await bot.tree.sync()
+        print(f"Comandos de barra sincronizados: {len(synced)}")
+    except Exception as e:
+        print(f"Erro ao sincronizar comandos: {e}")
+
+    # Inicia o loop de backup automático
+    backup_drive.start()
+
+
+# ---------------- Google Drive Config ----------------
+GOOGLE_CREDENTIALS = os.getenv("GOOGLE_CREDENTIALS")
+DRIVE_FILE_ID = os.getenv("DRIVE_FILE_ID")
+
+if not GOOGLE_CREDENTIALS or not DRIVE_FILE_ID:
+    print("❌ Faltando variáveis de ambiente GOOGLE_CREDENTIALS ou DRIVE_FILE_ID")
+    exit(1)
+
+creds = service_account.Credentials.from_service_account_info(
+    json.loads(GOOGLE_CREDENTIALS),
+    scopes=["https://www.googleapis.com/auth/drive.file"]
+)
+drive_service = build("drive", "v3", credentials=creds)
+
+def upload_file(local_path=DATA_FILE):
+    """Envia o arquivo local para o Google Drive"""
+    media = MediaFileUpload(local_path, mimetype="application/json", resumable=True)
+    drive_service.files().update(
+        fileId=DRIVE_FILE_ID,
+        media_body=media
+    ).execute()
+
+def download_file(local_path=DATA_FILE):
+    """Baixa o arquivo do Google Drive"""
+    request = drive_service.files().get_media(fileId=DRIVE_FILE_ID)
+    fh = io.FileIO(local_path, "wb")
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
+# -----------------------------------------------------
 # HELP - lista todos os comandos
 # ----------------------------------------
 @bot.tree.command(name="help", description="Mostra todos os comandos disponíveis.")

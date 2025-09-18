@@ -6,7 +6,6 @@ import re
 import json
 import os
 import io
-from datetime import datetime
 
 # Google Drive API
 from google.oauth2 import service_account
@@ -22,60 +21,92 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 DATA_FILE = "data.json"
-LOG_FILE = "log.json"
+LOGS_FILE = "logs.txt"
 user_counters = {}
 
 def get_display_name(user: discord.User | discord.Member) -> str:
+    """Retorna o apelido (display_name) se for membro, senão o nome global."""
     return user.display_name if isinstance(user, discord.Member) else user.name
 
-# ---------------- Funções de Log ----------------
-def registrar_log(usuario, acao, novo_valor, feito_por=None):
-    log_entry = {
-        "usuario": get_display_name(usuario),
-        "user_id": usuario.id,
-        "acao": acao,
-        "novo_valor": novo_valor,
-        "feito_por": get_display_name(feito_por) if feito_por else "Sistema",
-        "feito_por_id": feito_por.id if feito_por else None,
-        "timestamp": datetime.utcnow().isoformat()
-    }
+# ---------------- Google Drive Config ----------------
+GOOGLE_CREDENTIALS = os.getenv("GOOGLE_CREDENTIALS")
+DRIVE_FILE_ID = os.getenv("DRIVE_FILE_ID")
+DRIVE_LOGS_ID = os.getenv("DRIVE_LOGS_ID")
 
-    logs = []
-    if os.path.exists(LOG_FILE):
-        with open(LOG_FILE, "r") as f:
-            try:
-                logs = json.load(f)
-            except json.JSONDecodeError:
-                logs = []
+if not GOOGLE_CREDENTIALS or not DRIVE_FILE_ID or not DRIVE_LOGS_ID:
+    print("❌ Faltando variáveis de ambiente GOOGLE_CREDENTIALS, DRIVE_FILE_ID ou DRIVE_LOGS_ID")
+    exit(1)
 
-    logs.append(log_entry)
+creds = service_account.Credentials.from_service_account_info(
+    json.loads(GOOGLE_CREDENTIALS),
+    scopes=["https://www.googleapis.com/auth/drive"]
+)
+drive_service = build("drive", "v3", credentials=creds)
 
-    with open(LOG_FILE, "w") as f:
-        json.dump(logs, f, indent=4)
+def upload_file(local_path=DATA_FILE):
+    media = MediaFileUpload(local_path, mimetype="application/json", resumable=True)
+    drive_service.files().update(fileId=DRIVE_FILE_ID, media_body=media).execute()
 
-def carregar_logs():
-    if os.path.exists(LOG_FILE):
-        with open(LOG_FILE, "r") as f:
-            try:
-                return json.load(f)
-            except json.JSONDecodeError:
-                return []
-    return []
+def download_file(local_path=DATA_FILE):
+    request = drive_service.files().get_media(fileId=DRIVE_FILE_ID)
+    fh = io.FileIO(local_path, "wb")
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
 
-# -------------------------------------------------------------
+def upload_logs(local_path=LOGS_FILE):
+    media = MediaFileUpload(local_path, mimetype="text/plain", resumable=True)
+    drive_service.files().update(fileId=DRIVE_LOGS_ID, media_body=media).execute()
 
+def download_logs(local_path=LOGS_FILE):
+    request = drive_service.files().get_media(fileId=DRIVE_LOGS_ID)
+    fh = io.FileIO(local_path, "wb")
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
+
+# ---------------- Funções de salvar/carregar ----------------
+def load_data():
+    try:
+        download_file(DATA_FILE)
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        print("⚠️ Arquivo data.json inválido. Criando novo.")
+        return {}
+    except Exception as e:
+        print(f"⚠️ Erro ao carregar dados do Drive: {e}")
+        return {}
+
+def save_data():
+    with open(DATA_FILE, "w") as f:
+        json.dump(user_counters, f, indent=4)
+    try:
+        upload_file(DATA_FILE)
+    except Exception as e:
+        print(f"⚠️ Erro ao salvar no Drive: {e}")
+
+def log_action(texto: str):
+    with open(LOGS_FILE, "a", encoding="utf-8") as f:
+        f.write(f"{texto}\n")
+    try:
+        upload_logs(LOGS_FILE)
+    except Exception as e:
+        print(f"⚠️ Erro ao salvar logs no Drive: {e}")
+
+# ---------------- BOT EVENTS ----------------
 @bot.event
 async def on_ready():
     global user_counters
     user_counters = load_data()
     print(f"✅ Bot conectado como {bot.user}")
-
     try:
         synced = await bot.tree.sync()
-        print(f"🔄 Comandos sincronizados: {len(synced)}")
+        print(f"Comandos de barra sincronizados: {len(synced)}")
     except Exception as e:
         print(f"Erro ao sincronizar comandos: {e}")
-
     backup_drive.start()
 
 @bot.event
@@ -88,62 +119,25 @@ async def on_message(message):
 
     for user_id_str in matches:
         user_id = int(user_id_str)
-
-        if str(user_id) in user_counters:
-            user_counters[str(user_id)] += 1
-        else:
-            user_counters[str(user_id)] = 1
-
+        user_counters[str(user_id)] = user_counters.get(str(user_id), 0) + 1
         save_data()
-
         user = bot.get_user(user_id) or await bot.fetch_user(user_id)
-
-        # Log
-        registrar_log(user, "incrementou", user_counters[str(user_id)], message.author)
-
         await message.channel.send(
-            f"🔢 {get_display_name(user)} já cometeu {user_counters[str(user_id)]} teamkills! Escola Lozenilson de TK está orgulhosa!"
+            f"🔢 {get_display_name(user)} já cometeu {user_counters[str(user_id)]} teamkills!"
         )
+        log_action(f"[TK] {get_display_name(user)} ({user_id}) → total: {user_counters[str(user_id)]}")
 
     await bot.process_commands(message)
 
-#---------- upload do datajson------------
+# ---------------- BACKUP AUTOMÁTICO ----------------
 @tasks.loop(minutes=15)
 async def backup_drive():
     try:
         upload_file(DATA_FILE)
-        print("☁️ Backup do data.json enviado para o Google Drive")
+        upload_logs(LOGS_FILE)
+        print("☁️ Backup automático de data.json e logs.txt enviado para o Google Drive")
     except Exception as e:
         print(f"⚠️ Erro no backup automático: {e}")
-
-# ---------------- Google Drive Config ----------------
-GOOGLE_CREDENTIALS = os.getenv("GOOGLE_CREDENTIALS")
-DRIVE_FILE_ID = os.getenv("DRIVE_FILE_ID")
-
-if not GOOGLE_CREDENTIALS or not DRIVE_FILE_ID:
-    print("❌ Faltando variáveis de ambiente GOOGLE_CREDENTIALS ou DRIVE_FILE_ID")
-    exit(1)
-
-creds = service_account.Credentials.from_service_account_info(
-    json.loads(GOOGLE_CREDENTIALS),
-    scopes=["https://www.googleapis.com/auth/drive"]
-)
-drive_service = build("drive", "v3", credentials=creds)
-
-def upload_file(local_path=DATA_FILE):
-    media = MediaFileUpload(local_path, mimetype="application/json", resumable=True)
-    drive_service.files().update(
-        fileId=DRIVE_FILE_ID,
-        media_body=media
-    ).execute()
-
-def download_file(local_path=DATA_FILE):
-    request = drive_service.files().get_media(fileId=DRIVE_FILE_ID)
-    fh = io.FileIO(local_path, "wb")
-    downloader = MediaIoBaseDownload(fh, request)
-    done = False
-    while not done:
-        status, done = downloader.next_chunk()
 
 # ---------------- HELP ----------------
 @bot.tree.command(name="help", description="Mostra todos os comandos disponíveis.")
@@ -161,164 +155,46 @@ async def help_command(interaction: discord.Interaction):
     if interaction.user.guild_permissions.administrator:
         embed.add_field(name="/zerar [usuário]", value="🔄 Zera o contador de um usuário.", inline=False)
         embed.add_field(name="/remover [usuário]", value="➖ Diminui em 1 o contador de um usuário.", inline=False)
-        embed.add_field(name="/backup", value="📂 Envia o arquivo data.json.", inline=False)
-        embed.add_field(name="/restaurar", value="♻️ Restaura o arquivo data.json enviado.", inline=False)
-        embed.add_field(name="/logs", value="📝 Mostra os últimos registros de alteração.", inline=False)
+        embed.add_field(name="/backup", value="📂 Envia o arquivo `data.json`.", inline=False)
+        embed.add_field(name="/restaurar", value="♻️ Restaura o `data.json` a partir de um upload.", inline=False)
+        embed.add_field(name="/logs", value="📜 Mostra os últimos registros de alterações.", inline=False)
+        embed.add_field(name="/exportlogs", value="📤 Exporta todo o arquivo `logs.txt`.", inline=False)
 
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# ---------------- Comandos de barra ----------------
-@bot.tree.command(name="zerar", description="Reseta o contador de um usuário (apenas admins).")
-@app_commands.describe(usuario="Usuário que você quer resetar")
-@app_commands.default_permissions(administrator=True)
-async def zerar(interaction: discord.Interaction, usuario: discord.User):
-    user_counters[str(usuario.id)] = 0
-    save_data()
-    registrar_log(usuario, "zerado", 0, interaction.user)
-    await interaction.response.send_message(f"🔄 O contador de {get_display_name(usuario)} foi resetado para 0.")
-
-@bot.tree.command(name="remover", description="Diminui em 1 o contador de um usuário (apenas admins).")
-@app_commands.describe(usuario="Usuário que você quer diminuir o contador")
-@app_commands.default_permissions(administrator=True)
-async def remover(interaction: discord.Interaction, usuario: discord.User):
-    user_id = str(usuario.id)
-    if user_id in user_counters and user_counters[user_id] > 0:
-        user_counters[user_id] -= 1
-        save_data()
-        registrar_log(usuario, "removido", user_counters[user_id], interaction.user)
-        await interaction.response.send_message(f"➖ O contador de {get_display_name(usuario)} foi diminuído para {user_counters[user_id]}.")
-    else:
-        await interaction.response.send_message(f"⚠️ O contador de {get_display_name(usuario)} já está em 0 e não pode ser diminuído.")
-
 # ---------------- LOGS ----------------
-@bot.tree.command(name="logs", description="Mostra os últimos 10 registros de alterações.")
+@bot.tree.command(name="logs", description="Mostra os últimos registros (apenas admins).")
 @app_commands.default_permissions(administrator=True)
 async def logs(interaction: discord.Interaction):
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message(
-            "❌ Você não tem permissão para usar este comando.",
-            ephemeral=True
-        )
+    if not os.path.exists(LOGS_FILE):
+        await interaction.response.send_message("⚠️ Nenhum log encontrado.", ephemeral=True)
         return
-
     try:
-        if not os.path.exists("logs.txt"):
-            await interaction.response.send_message(
-                "⚠️ Ainda não há registros disponíveis.",
-                ephemeral=True
-            )
-            return
-
-        with open("logs.txt", "r", encoding="utf-8") as f:
-            linhas = f.readlines()
-
-        # Pega só os últimos 10 registros
-        ultimos = linhas[-10:] if len(linhas) > 10 else linhas
-
-        embed = discord.Embed(
-            title="📜 Últimos Logs",
-            description="Aqui estão os últimos registros de alterações:",
-            color=discord.Color.orange()
-        )
-
-        # Junta os registros dentro de um bloco de código
-        embed.add_field(
-            name="Registros",
-            value="```" + "".join(ultimos) + "```",
-            inline=False
-        )
-
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
+        with open(LOGS_FILE, "r", encoding="utf-8") as f:
+            linhas = f.readlines()[-10:]
+        texto = "".join(linhas) if linhas else "⚠️ Nenhum log registrado."
+        await interaction.response.send_message(f"📜 **Últimos registros:**\n```\n{texto}\n```", ephemeral=True)
     except Exception as e:
-        await interaction.response.send_message(
-            f"⚠️ Erro ao carregar os logs: {e}",
-            ephemeral=True
-        )
+        await interaction.response.send_message(f"⚠️ Erro ao carregar logs: {e}", ephemeral=True)
 
-@bot.tree.command(name="exportlogs", description="Exporta todos os registros de alterações em um arquivo.")
+@bot.tree.command(name="exportlogs", description="Exporta o arquivo completo de logs (apenas admins).")
 @app_commands.default_permissions(administrator=True)
 async def exportlogs(interaction: discord.Interaction):
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message(
-            "❌ Você não tem permissão para usar este comando.",
-            ephemeral=True
-        )
+    if not os.path.exists(LOGS_FILE):
+        await interaction.response.send_message("⚠️ Nenhum log encontrado.", ephemeral=True)
         return
-
     try:
-        if not os.path.exists("logs.txt"):
-            await interaction.response.send_message(
-                "⚠️ Ainda não há registros disponíveis.",
-                ephemeral=True
-            )
-            return
-
-        await interaction.response.send_message(
-            "📂 Aqui está o arquivo completo de logs:",
-            file=discord.File("logs.txt"),
-            ephemeral=True
-        )
+        download_logs(LOGS_FILE)
+        await interaction.response.send_message("📤 Aqui está o arquivo `logs.txt`:", file=discord.File(LOGS_FILE), ephemeral=True)
     except Exception as e:
-        await interaction.response.send_message(
-            f"⚠️ Erro ao exportar logs: {e}",
-            ephemeral=True
-        )
+        await interaction.response.send_message(f"⚠️ Erro ao exportar logs: {e}", ephemeral=True)
 
-
-# ---------------- EXPORTAR LOGS ----------------
-@bot.tree.command(name="exportlogs", description="Envia o arquivo log.json completo (apenas admins).")
-@app_commands.default_permissions(administrator=True)
-async def exportlogs(interaction: discord.Interaction):
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message(
-            "❌ Você não tem permissão para usar este comando.",
-            ephemeral=True
-        )
-        return
-
-    if not os.path.exists(LOG_FILE):
-        await interaction.response.send_message(
-            "⚠️ Nenhum log foi registrado ainda.",
-            ephemeral=True
-        )
-        return
-
-    try:
-        await interaction.response.send_message(
-            "📂 Aqui está o arquivo completo de logs:",
-            file=discord.File(LOG_FILE)
-        )
-    except Exception as e:
-        await interaction.response.send_message(
-            f"⚠️ Erro ao enviar log.json: {e}",
-            ephemeral=True
-        )
-
-
-# ---------------- Funções de salvar/carregar ----------------
-def load_data():
-    try:
-        download_file(DATA_FILE)
-        with open(DATA_FILE, "r") as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        return {}
-    except Exception:
-        return {}
-
-def save_data():
-    with open(DATA_FILE, "w") as f:
-        json.dump(user_counters, f, indent=4)
-    try:
-        upload_file(DATA_FILE)
-    except Exception as e:
-        print(f"⚠️ Erro ao salvar no Drive: {e}")
-
-# ----------------------------------------------------
+# ---------------- BOT TOKEN ----------------
 bot_token = os.getenv("DISCORD_BOT_TOKEN")
 if bot_token:
     keep_alive()
     bot.run(bot_token)
 else:
     print("❌ DISCORD_BOT_TOKEN não encontrado nas variáveis de ambiente.")
+
+

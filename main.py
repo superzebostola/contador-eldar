@@ -136,7 +136,7 @@ async def on_message(message):
     await bot.process_commands(message)
 
 # ---------------- HELP ----------------
-@bot.tree.command(name="help", description="Mostra todos os comandos disponíveis.")
+@bot.tree.command(name="ajuda", description="Mostra todos os comandos disponíveis.")
 async def help_command(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     embed = discord.Embed(

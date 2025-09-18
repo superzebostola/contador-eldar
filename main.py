@@ -328,12 +328,14 @@ async def backup_drive():
 async def resync(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     try:
-        # 🔄 Sincroniza global
+        # 🔄 Primeiro limpa os comandos globais
+        bot.tree.clear_commands(guild=None)
         synced_global = await bot.tree.sync()
-        msg = [f"🌍 {len(synced_global)} comandos sincronizados globalmente"]
+        msg = [f"🌍 {len(synced_global)} comandos sincronizados globalmente (limpos e recarregados)"]
 
-        # 🔄 Sincroniza para cada guild atual
+        # 🔄 Agora limpa e sincroniza cada guild
         for guild in bot.guilds:
+            bot.tree.clear_commands(guild=guild)
             synced_guild = await bot.tree.sync(guild=guild)
             msg.append(f"🏠 {len(synced_guild)} comandos sincronizados com {guild.name} ({guild.id})")
 
@@ -341,6 +343,7 @@ async def resync(interaction: discord.Interaction):
 
     except Exception as e:
         await interaction.followup.send(f"❌ Erro ao resincronizar: {e}", ephemeral=True)
+
 
 
 

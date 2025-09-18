@@ -32,9 +32,13 @@ def load_data():
         download_file(DATA_FILE)
         with open(DATA_FILE, "r") as f:
             return json.load(f)
+    except json.JSONDecodeError:
+        print("⚠️ Arquivo data.json inválido. Criando novo.")
+        return {}
     except Exception as e:
         print(f"⚠️ Erro ao carregar dados do Drive: {e}")
         return {}
+
 
 def save_data():
     with open(DATA_FILE, "w") as f:

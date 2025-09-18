@@ -70,9 +70,16 @@ def download_logs(local_path=LOGS_FILE):
 # ---------------- Funções de salvar/carregar ----------------
 def load_data():
     try:
+        # Tenta baixar do Drive
         download_file(DATA_FILE)
-        with open(DATA_FILE, "r") as f:
-            return json.load(f)
+
+        if os.path.exists(DATA_FILE) and os.path.getsize(DATA_FILE) > 0:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        else:
+            print("⚠️ Arquivo data.json vazio. Mantendo dados locais.")
+            return {}
+
     except json.JSONDecodeError:
         print("⚠️ Arquivo data.json inválido. Criando novo.")
         return {}
@@ -80,13 +87,21 @@ def load_data():
         print(f"⚠️ Erro ao carregar dados do Drive: {e}")
         return {}
 
+
 def save_data():
-    with open(DATA_FILE, "w") as f:
-        json.dump(user_counters, f, indent=4)
+    if not user_counters:
+        print("⚠️ Dados estão vazios, não vou sobrescrever o data.json.")
+        return
+
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(user_counters, f, indent=4, ensure_ascii=False)
+
     try:
         upload_file(DATA_FILE)
+        print("☁️ data.json atualizado no Google Drive")
     except Exception as e:
         print(f"⚠️ Erro ao salvar no Drive: {e}")
+
 
 def log_action(texto: str):
     with open(LOGS_FILE, "a", encoding="utf-8") as f:

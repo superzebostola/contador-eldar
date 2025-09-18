@@ -17,8 +17,8 @@ from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 # Substitua pelos IDs das 3 guilds onde você quer forçar sync imediato
 GUILD_IDS = [
     432367752418820137,   # guild 1 (exemplo)
-    123456789012345678,   # guild 2 (exemplo)
-    987654321098765432    # guild 3 (exemplo)
+    1223066167825010709,   # guild 2 (exemplo)
+    1417622405710614730    # guild 3 (exemplo)
 ]
 
 DATA_FILE = "data.json"

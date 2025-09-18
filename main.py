@@ -148,10 +148,12 @@ async def help_command(interaction: discord.Interaction):
         color=discord.Color.blue()
     )
 
+    # Comandos de uso geral
     embed.add_field(name="/contador [usuário]", value="📊 Mostra quantos teamkills um usuário já cometeu.", inline=False)
     embed.add_field(name="/meucontador", value="🙋 Mostra quantos teamkills você mesmo já cometeu.", inline=False)
     embed.add_field(name="/top", value="🏆 Mostra o ranking dos 10 usuários com mais teamkills.", inline=False)
 
+    # Comandos administrativos
     if interaction.user.guild_permissions.administrator:
         embed.add_field(name="/zerar [usuário]", value="🔄 Zera o contador de um usuário.", inline=False)
         embed.add_field(name="/remover [usuário]", value="➖ Diminui em 1 o contador de um usuário.", inline=False)

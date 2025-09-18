@@ -24,6 +24,9 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 DATA_FILE = "data.json"
 user_counters = {}
 
+def get_display_name(user: discord.User | discord.Member) -> str:
+    """Retorna o apelido (display_name) se for membro, senão o nome global."""
+    return user.display_name if isinstance(user, discord.Member) else user.name
 
 
 
@@ -65,7 +68,9 @@ async def on_message(message):
 
         user = bot.get_user(user_id) or await bot.fetch_user(user_id)
         await message.channel.send(
-            f"🔢 {user.name} já cometeu {user_counters[str(user_id)]} teamkills! Escola Lozenilson de TK está orgulhosa!"
+    f"🔢 {get_display_name(user)} já cometeu {user_counters[str(user_id)]} teamkills! Escola Lozenilson de TK está orgulhosa!"
+)
+
         )
 
     await bot.process_commands(message)
@@ -152,14 +157,17 @@ async def help_command(interaction: discord.Interaction):
 async def contador(interaction: discord.Interaction, usuario: discord.User):
     count = user_counters.get(str(usuario.id), 0)
     await interaction.response.send_message(
-        f"📊 {usuario.name} tem atualmente {count} teamkill(s)."
+        f"📊 {get_display_name(usuario)} tem atualmente {count} teamkill(s)."
+
+
     )
 
 @bot.tree.command(name="meucontador", description="Veja quantos teamkills você já cometeu.")
 async def meucontador(interaction: discord.Interaction):
     count = user_counters.get(str(interaction.user.id), 0)
     await interaction.response.send_message(
-        f"🙋 {interaction.user.name}, você tem atualmente {count} tk(s)."
+        f"🙋 {get_display_name(interaction.user)}, você tem atualmente {count} tk(s)."
+
     )
 
 @bot.tree.command(name="top", description="Mostra o ranking de usuários com mais teamkills do esquadrão.")
@@ -173,7 +181,8 @@ async def top(interaction: discord.Interaction):
 
     for i, (user_id, count) in enumerate(ranking[:10], start=1):
         user = bot.get_user(int(user_id)) or await bot.fetch_user(int(user_id))
-        top_text += f"**{i}.** {user.name} — {count} teamkill(s)\n"
+        top_text += f"**{i}.** {get_display_name(user)} — {count} teamkill(s)\n"
+
 
     await interaction.response.send_message(top_text)
 
@@ -187,7 +196,7 @@ async def zerar(interaction: discord.Interaction, usuario: discord.User):
 
     user_counters[str(usuario.id)] = 0
     save_data()
-    await interaction.response.send_message(f"🔄 O contador de {usuario.name} foi resetado para 0.")
+    await interaction.response.send_message(f"🔄 O contador de {get_display_name(usuario)} foi resetado para 0.")
 
 @bot.tree.command(name="remover", description="Diminui em 1 o contador de um usuário (apenas admins).")
 @app_commands.describe(usuario="Usuário que você quer diminuir o contador")
@@ -201,9 +210,9 @@ async def remover(interaction: discord.Interaction, usuario: discord.User):
     if user_id in user_counters and user_counters[user_id] > 0:
         user_counters[user_id] -= 1
         save_data()
-        await interaction.response.send_message(f"➖ O contador de {usuario.name} foi diminuído para {user_counters[user_id]}.")
+        await interaction.response.send_message(f"➖ O contador de {get_display_name(usuario)} foi diminuído para {user_counters[user_id]}.")
     else:
-        await interaction.response.send_message(f"⚠️ O contador de {usuario.name} já está em 0 e não pode ser diminuído.")
+        await interaction.response.send_message(f"⚠️ O contador de {get_display_name(usuario)} já está em 0 e não pode ser diminuído.")
 
 # ---------------- BACKUP ----------------
 @bot.tree.command(name="backup", description="Envia o arquivo data.json (apenas admins).")

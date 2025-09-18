@@ -254,24 +254,32 @@ async def restaurar(interaction: discord.Interaction, arquivo: discord.Attachmen
 
         @discord.ui.button(label="✅ Confirmar", style=discord.ButtonStyle.green)
         async def confirmar(self, interaction_btn: discord.Interaction, button: discord.ui.Button):
+            await interaction_btn.response.defer(ephemeral=True)  # evita timeout
             try:
                 file_bytes = await arquivo.read()
                 with open(DATA_FILE, "wb") as f:
                     f.write(file_bytes)
+
                 global user_counters
                 with open(DATA_FILE, "r") as f:
                     user_counters = json.load(f)
+
                 save_data()
                 log_action(f"[RESTAURAR] {get_display_name(interaction.user)} restaurou o data.json com um novo arquivo")
-                await interaction_btn.response.edit_message(content="♻️ O arquivo `data.json` foi restaurado com sucesso!", view=None)
+
+                await interaction_btn.followup.send("♻️ O arquivo `data.json` foi restaurado com sucesso!", ephemeral=True)
             except Exception as e:
-                await interaction_btn.response.edit_message(content=f"⚠️ Erro ao restaurar: {e}", view=None)
+                await interaction_btn.followup.send(f"⚠️ Erro ao restaurar: {e}", ephemeral=True)
 
         @discord.ui.button(label="❌ Cancelar", style=discord.ButtonStyle.red)
         async def cancelar(self, interaction_btn: discord.Interaction, button: discord.ui.Button):
             await interaction_btn.response.edit_message(content="❌ Restauração cancelada.", view=None)
 
-    await interaction.response.send_message("⚠️ Tem certeza que deseja **sobrescrever** o arquivo `data.json`?", view=ConfirmarView(), ephemeral=True)
+    await interaction.response.send_message(
+        "⚠️ Tem certeza que deseja **sobrescrever** o arquivo `data.json`?",
+        view=ConfirmarView(),
+        ephemeral=True
+    )
 
 # ---------------- LOGS ----------------
 @bot.tree.command(name="logs", description="Mostra os últimos registros (apenas admins).")

@@ -114,7 +114,7 @@ async def on_ready():
     print(f"✅ Bot conectado como {bot.user}")
 
     try:
-        guild_ids = [432367752418820137, 123456789012345678]  # substitua pelos seus IDs
+        guild_ids = [432367752418820137, 11417622405710614730]  # substitua pelos seus IDs
         for gid in guild_ids:
             guild = discord.Object(id=gid)
             synced = await bot.tree.sync(guild=guild)

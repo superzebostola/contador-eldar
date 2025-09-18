@@ -102,12 +102,18 @@ async def on_ready():
     global user_counters
     user_counters = load_data()
     print(f"✅ Bot conectado como {bot.user}")
+
     try:
-        synced = await bot.tree.sync()
-        print(f"Comandos de barra sincronizados: {len(synced)}")
+        # 🔽 Coloque aqui o ID do seu servidor
+        GUILD_ID = 432367752418820137  
+        guild = discord.Object(id=GUILD_ID)
+        synced = await bot.tree.sync(guild=guild)
+        print(f"✅ {len(synced)} comandos sincronizados com a guild {GUILD_ID}")
     except Exception as e:
-        print(f"Erro ao sincronizar comandos: {e}")
+        print(f"⚠️ Erro ao sincronizar comandos: {e}")
+
     backup_drive.start()
+
 
 @bot.event
 async def on_message(message):

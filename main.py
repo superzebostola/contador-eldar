@@ -65,7 +65,7 @@ async def on_message(message):
 
         user = bot.get_user(user_id) or await bot.fetch_user(user_id)
         await message.channel.send(
-            f"🔢 {user.mention} já cometeu {user_counters[str(user_id)]} teamkills! Escola Lozenilson de TK está orgulhosa!"
+            f"🔢 {user.name} já cometeu {user_counters[str(user_id)]} teamkills! Escola Lozenilson de TK está orgulhosa!"
         )
 
     await bot.process_commands(message)

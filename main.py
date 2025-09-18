@@ -141,30 +141,32 @@ def log_action(texto: str):
         print(f"⚠️ Erro ao gravar logs locais: {e}")
         traceback.print_exc()
 
-# ---------------- BOT EVENTS ----------------
 @bot.event
 async def on_ready():
     global user_counters
     user_counters = load_data()
-    print(f"✅ Bot conectado como {bot.user}")
+    print(f"✅ Bot conectado como {bot.user} (ID: {bot.user.id})")
+    print(f"🔍 Estou em {len(bot.guilds)} servidores: {[g.name for g in bot.guilds]}")
 
     try:
         msgs = []
+        print("🔄 Iniciando sincronização de comandos...")
+
         # limpa e sincroniza por cada guild listado
         for gid in GUILD_IDS:
             try:
+                print(f"➡️ Tentando sincronizar comandos com a guild {gid}...")
                 guild_obj = discord.Object(id=gid)
-                # limpa comandos antigos desta guild (síncrono)
                 bot.tree.clear_commands(guild=guild_obj)
-                # sincroniza
                 synced = await bot.tree.sync(guild=guild_obj)
                 msgs.append(f"✅ {len(synced)} comandos sincronizados com a guild {gid}")
             except Exception as gi_e:
                 msgs.append(f"⚠️ Erro ao sincronizar guild {gid}: {gi_e}")
                 traceback.print_exc()
 
-        # limpa e sincroniza global (opcional) — útil caso haja comando global antigo
+        # sincronização global
         try:
+            print("➡️ Tentando sincronizar comandos globais...")
             bot.tree.clear_commands(guild=None)
             synced_global = await bot.tree.sync()
             msgs.append(f"🌍 {len(synced_global)} comandos sincronizados globalmente (após limpeza)")
@@ -173,6 +175,7 @@ async def on_ready():
             traceback.print_exc()
 
         # imprime resumo
+        print("📋 Resumo da sincronização:")
         for m in msgs:
             print(m)
 
@@ -180,13 +183,15 @@ async def on_ready():
         print(f"⚠️ Erro inesperado no on_ready: {e}")
         traceback.print_exc()
 
-    # inicia o loop de backup (se ainda não rodando)
+    # inicia o loop de backup
     try:
         if not backup_drive.is_running():
             backup_drive.start()
+            print("☁️ Loop de backup automático iniciado.")
     except Exception as e:
         print(f"⚠️ Erro ao iniciar backup_drive: {e}")
         traceback.print_exc()
+
 
 
 @bot.event

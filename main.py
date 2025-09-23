@@ -107,9 +107,7 @@ def save_data():
 
 @bot.event
 async def on_ready():
-   @bot.event
-async def on_ready():
-    global user_counters
+      global user_counters
     user_counters = load_data()
     logger.info(f"✅ Bot conectado como {bot.user}")
     save_logs()  # <-- adiciona aqui

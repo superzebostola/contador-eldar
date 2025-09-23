@@ -39,9 +39,10 @@ user_counters = {}
 # ---------------- Google Drive Config ----------------
 GOOGLE_CREDENTIALS = os.getenv("GOOGLE_CREDENTIALS")
 DRIVE_FILE_ID = os.getenv("DRIVE_FILE_ID")
+DRIVE_LOGS_ID = os.getenv("DRIVE_LOGS_ID")
 
-if not GOOGLE_CREDENTIALS or not DRIVE_FILE_ID:
-    logging.error("❌ Faltando variáveis de ambiente GOOGLE_CREDENTIALS ou DRIVE_FILE_ID")
+if not GOOGLE_CREDENTIALS or not DRIVE_FILE_ID or not DRIVE_LOGS_ID:
+    logging.error("❌ Faltando variáveis de ambiente (GOOGLE_CREDENTIALS, DRIVE_FILE_ID ou DRIVE_LOGS_ID)")
     exit(1)
 
 creds = service_account.Credentials.from_service_account_info(
@@ -51,31 +52,34 @@ creds = service_account.Credentials.from_service_account_info(
 drive_service = build("drive", "v3", credentials=creds)
 
 
-def upload_file(local_path=DATA_FILE):
-    """Sobrescreve o conteúdo do arquivo no Google Drive"""
+def upload_file(local_path, file_id):
+    """Sobrescreve o conteúdo de um arquivo no Google Drive"""
     try:
-        media = MediaFileUpload(local_path, mimetype="application/json", resumable=False)
+        # Define o mimetype conforme o arquivo
+        mimetype = "application/json" if local_path.endswith(".json") else "text/plain"
+        media = MediaFileUpload(local_path, mimetype=mimetype, resumable=False)
         drive_service.files().update(
-            fileId=DRIVE_FILE_ID,
+            fileId=file_id,
             media_body=media
         ).execute()
-        logging.info("✅ Arquivo sobrescrito no Google Drive")
+        logging.info(f"✅ Arquivo {local_path} sobrescrito no Google Drive (ID={file_id})")
     except Exception as e:
-        logging.error(f"⚠️ Erro ao sobrescrever arquivo no Drive: {e}")
+        logging.error(f"⚠️ Erro ao sobrescrever {local_path} no Drive: {e}")
 
 
-def download_file(local_path=DATA_FILE):
-    """Baixa o arquivo do Google Drive"""
+def download_file(local_path, file_id):
+    """Baixa o conteúdo de um arquivo do Google Drive"""
     try:
-        request = drive_service.files().get_media(fileId=DRIVE_FILE_ID)
+        request = drive_service.files().get_media(fileId=file_id)
         fh = io.FileIO(local_path, "wb")
         downloader = MediaIoBaseDownload(fh, request)
         done = False
         while not done:
             status, done = downloader.next_chunk()
-        logging.info("✅ Arquivo baixado do Google Drive")
+        logging.info(f"✅ Arquivo {local_path} baixado do Google Drive (ID={file_id})")
     except Exception as e:
-        logging.error(f"⚠️ Erro ao baixar arquivo do Drive: {e}")
+        logging.error(f"⚠️ Erro ao baixar {local_path} do Drive: {e}")
+
 
 
 # ---------------- Funções de salvar/carregar ----------------
@@ -90,24 +94,31 @@ def load_data():
 
 
 def save_data():
-    with open(DATA_FILE, "w") as f:
-        json.dump(user_counters, f, indent=4)
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(user_counters, f, indent=4, ensure_ascii=False)
     try:
-        upload_file(DATA_FILE)
+        upload_file(DATA_FILE, DRIVE_FILE_ID)
+        upload_file(LOG_FILE, DRIVE_LOGS_ID)  # <-- aqui envia os logs junto
     except Exception as e:
-        logging.error(f"⚠️ Erro ao salvar no Drive: {e}")
+        logging.error(f"⚠️ Erro ao salvar arquivos no Drive: {e}")
+
+
 # -------------------------------------------------------------
 
 @bot.event
 async def on_ready():
+   @bot.event
+async def on_ready():
     global user_counters
     user_counters = load_data()
-    logging.info(f"✅ Bot conectado como {bot.user}")
+    logger.info(f"✅ Bot conectado como {bot.user}")
+    save_logs()  # <-- adiciona aqui
     try:
         synced = await bot.tree.sync()
-        logging.info(f"Comandos de barra sincronizados: {len(synced)}")
+        logger.info(f"Comandos de barra sincronizados: {len(synced)}")
     except Exception as e:
-        logging.error(f"Erro ao sincronizar comandos: {e}")
+        logger.error(f"Erro ao sincronizar comandos: {e}")
+
 
 
 # COMANDO TK
@@ -252,6 +263,11 @@ async def remover(interaction: discord.Interaction, usuario: discord.User):
 # exportarlogs
 @bot.tree.command(name="exportarlogs", description="Exporta o arquivo de logs do bot.")
 async def exportarlogs(interaction: discord.Interaction):
+    try:
+        download_file(LOG_FILE, DRIVE_LOGS_ID)  # pega a versão mais recente do Drive
+    except Exception as e:
+        logging.warning(f"⚠️ Não foi possível atualizar logs do Drive: {e}")
+
     if os.path.exists(LOG_FILE):
         await interaction.response.send_message(
             file=discord.File(LOG_FILE),

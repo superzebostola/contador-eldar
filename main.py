@@ -8,6 +8,8 @@ import os
 import io
 import logging
 import datetime
+from discord.ext import tasks
+
 
 # IDs autorizados a usar comandos de admin
 ADMIN_IDS = [
@@ -123,9 +125,20 @@ def save_data():
     except Exception as e:
         logging.error(f"⚠️ Erro ao salvar arquivos no Drive: {e}")
 
+# ---------------- Backup Automático ----------------
+@tasks.loop(minutes=10)  # 🔄 executa a cada 10 minutos (pode mudar o tempo)
+async def backup_periodico():
+    try:
+        if user_counters:  # só salva se houver dados
+            save_data()
+            logging.info("💾 Backup automático concluído com sucesso.")
+        else:
+            logging.warning("⚠️ Backup automático ignorado (sem dados).")
+    except Exception as e:
+        logging.error(f"❌ Erro no backup automático: {e}")
 
 
-# -------------------------------------------------------------
+# INICIANDO O BOT
 @bot.event
 async def on_ready():
     global user_counters
@@ -143,8 +156,13 @@ async def on_ready():
         synced_guild = await bot.tree.sync(guild=guild)
         logging.info(f"⚡ Comandos sincronizados no servidor {GUILD_ID}: {len(synced_guild)}")
 
+        # 🔹 Inicia backup periódico
+        backup_periodico.start()
+        logging.info("⏰ Backup automático iniciado (a cada 10 min).")
+
     except Exception as e:
         logging.error(f"❌ Erro ao sincronizar comandos: {e}")
+
 
 
 

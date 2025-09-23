@@ -9,6 +9,15 @@ import io
 import logging
 import datetime
 
+# IDs autorizados a usar comandos de admin
+ADMIN_IDS = [
+    245362455377739778,  # Substitua pelo seu ID
+    310194866191859712   # Pode adicionar mais IDs
+]
+
+def is_admin(user_id: int) -> bool:
+    return user_id in ADMIN_IDS
+
 # Google Drive API
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -193,13 +202,13 @@ async def ajuda_command(interaction: discord.Interaction):
         color=discord.Color.blue()
     )
 
-    # Comandos gerais (todos veem)
+    # Comandos gerais
     embed.add_field(name="/contador [usuário]", value="📊 Mostra quantos teamkills um usuário já cometeu.", inline=False)
     embed.add_field(name="/meucontador", value="🙋 Mostra quantos teamkills você mesmo já cometeu.", inline=False)
     embed.add_field(name="/top", value="🏆 Mostra o ranking dos 10 usuários com mais teamkills.", inline=False)
 
-    # Se o usuário for admin, adiciona os comandos de administração
-    if isinstance(interaction.user, discord.Member) and interaction.user.guild_permissions.administrator:
+    # Se for admin autorizado
+    if is_admin(interaction.user.id):
         embed.add_field(name="⠀", value="**⚙️ Comandos de Administração:**", inline=False)
         embed.add_field(name="/zerar [usuário]", value="🔄 Zera o contador de um usuário.", inline=False)
         embed.add_field(name="/remover [usuário]", value="➖ Diminui em 1 o contador de um usuário.", inline=False)
@@ -208,6 +217,7 @@ async def ajuda_command(interaction: discord.Interaction):
         embed.add_field(name="/importardata", value="📥 Importa e substitui o arquivo data.json.", inline=False)
 
     await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 
 
@@ -259,9 +269,8 @@ async def top(interaction: discord.Interaction):
 #COMANDO /ZERAR
 @bot.tree.command(name="zerar", description="Reseta o contador de um usuário (apenas admins).")
 @app_commands.describe(usuario="Usuário que você quer resetar")
-@app_commands.default_permissions(administrator=True)
 async def zerar(interaction: discord.Interaction, usuario: discord.User):
-    if not isinstance(interaction.user, discord.Member) or not interaction.user.guild_permissions.administrator:
+    if not is_admin(interaction.user.id):
         await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
         return
 
@@ -270,18 +279,17 @@ async def zerar(interaction: discord.Interaction, usuario: discord.User):
     user_counters.setdefault("deaths", {})[user_id] = 0
 
     save_data()
-
     logging.info(f"[ZERAR] {interaction.user.display_name} resetou o contador de {usuario.display_name}")
 
     await interaction.response.send_message(f"🔄 O contador de {usuario.display_name} foi resetado para 0.")
 
 
+
 #COMANDO /REMOVER
 @bot.tree.command(name="remover", description="Diminui em 1 o contador de um usuário (apenas admins).")
 @app_commands.describe(usuario="Usuário que você quer diminuir o contador")
-@app_commands.default_permissions(administrator=True)
 async def remover(interaction: discord.Interaction, usuario: discord.User):
-    if not isinstance(interaction.user, discord.Member) or not interaction.user.guild_permissions.administrator:
+    if not is_admin(interaction.user.id):
         await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
         return
 
@@ -301,16 +309,23 @@ async def remover(interaction: discord.Interaction, usuario: discord.User):
             f"⚠️ O contador de {usuario.display_name} já está em 0 e não pode ser diminuído."
         )
 
+        )
+
 
 #COMANDO /EXPORTARLOGS
-@bot.tree.command(name="exportarlogs", description="Exporta o arquivo de logs do bot.")
+@bot.tree.command(name="exportarlogs", description="Exporta o arquivo de logs do bot (apenas admins).")
 async def exportarlogs(interaction: discord.Interaction):
+    if not is_admin(interaction.user.id):
+        await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
+        return
+
     try:
         download_file(LOG_FILE, DRIVE_LOGS_ID)  # pega a versão mais recente do Drive
     except Exception as e:
         logging.warning(f"⚠️ Não foi possível atualizar logs do Drive: {e}")
 
     if os.path.exists(LOG_FILE):
+        logging.info(f"[EXPORTAR LOGS] {interaction.user.display_name} exportou o logs.txt")
         await interaction.response.send_message(
             file=discord.File(LOG_FILE),
             ephemeral=True
@@ -318,10 +333,14 @@ async def exportarlogs(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("❌ Nenhum log encontrado.", ephemeral=True)
 
+
 #COMANDO /EXPORTARDATA
 @bot.tree.command(name="exportardata", description="Exporta o arquivo data.json (apenas admins).")
-@app_commands.default_permissions(administrator=True)
 async def exportardata(interaction: discord.Interaction):
+    if not is_admin(interaction.user.id):
+        await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
+        return
+
     try:
         try:
             download_file(DATA_FILE, DRIVE_FILE_ID)
@@ -340,10 +359,14 @@ async def exportardata(interaction: discord.Interaction):
         logging.error(f"Erro ao exportar data.json: {e}")
         await interaction.response.send_message("❌ Erro ao exportar data.json.", ephemeral=True)
 
+
 #COMANDO /IMPORTARDATA
 @bot.tree.command(name="importardata", description="Importa e substitui o arquivo data.json (apenas admins).")
-@app_commands.default_permissions(administrator=True)
 async def importardata(interaction: discord.Interaction, arquivo: discord.Attachment):
+    if not is_admin(interaction.user.id):
+        await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
+        return
+
     if not arquivo.filename.endswith(".json"):
         await interaction.response.send_message("❌ O arquivo precisa ser um .json válido.", ephemeral=True)
         return
@@ -358,13 +381,13 @@ async def importardata(interaction: discord.Interaction, arquivo: discord.Attach
             user_counters = json.load(f)
 
         save_data()
-
         logging.info(f"[IMPORTAR DATA] {interaction.user.display_name} importou um novo data.json ({arquivo.filename})")
 
         await interaction.response.send_message("✅ data.json importado e atualizado com sucesso!", ephemeral=True)
     except Exception as e:
         logging.error(f"Erro ao importar data.json: {e}")
         await interaction.response.send_message("❌ Erro ao importar data.json.", ephemeral=True)
+
 
 # ----------------------------------------------------
 bot_token = os.getenv("DISCORD_BOT_TOKEN")

@@ -122,11 +122,21 @@ async def on_ready():
     global user_counters
     user_counters = load_data()
     logging.info(f"✅ Bot conectado como {bot.user}")
+
     try:
-        synced = await bot.tree.sync()
-        logging.info(f"Comandos de barra sincronizados: {len(synced)}")
+        # 🔹 Sincroniza comandos globais (demora até 1h para refletir)
+        synced_global = await bot.tree.sync()
+        logging.info(f"🌍 Comandos globais sincronizados: {len(synced_global)}")
+
+        # 🔹 Sincroniza comandos em um servidor específico (instantâneo)
+        GUILD_ID = 432367752418820137  # sv eldar
+        guild = discord.Object(id=GUILD_ID)
+        synced_guild = await bot.tree.sync(guild=guild)
+        logging.info(f"⚡ Comandos sincronizados no servidor {GUILD_ID}: {len(synced_guild)}")
+
     except Exception as e:
-        logging.error(f"Erro ao sincronizar comandos: {e}")
+        logging.error(f"❌ Erro ao sincronizar comandos: {e}")
+
 
 
 # ---------------- Eventos ----------------

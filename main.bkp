@@ -68,25 +68,33 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    pattern = r"<@!?(\d+)>\s+tk"
+    # Novo padrão: @culpado tk @vitima
+    pattern = r"<@!?(\d+)>\s+tk\s+<@!?(\d+)>"
     matches = re.findall(pattern, message.content, flags=re.IGNORECASE)
 
-    for user_id_str in matches:
-        user_id = int(user_id_str)
+    for culpado_id_str, vitima_id_str in matches:
+        culpado_id = int(culpado_id_str)
+        vitima_id = int(vitima_id_str)
 
-        if str(user_id) in user_counters:
-            user_counters[str(user_id)] += 1
+        # Atualiza contador do culpado
+        if str(culpado_id) in user_counters:
+            user_counters[str(culpado_id)] += 1
         else:
-            user_counters[str(user_id)] = 1
+            user_counters[str(culpado_id)] = 1
 
         save_data()
 
-        mentioned_user = await bot.fetch_user(user_id)
+        culpado_user = await bot.fetch_user(culpado_id)
+        vitima_user = await bot.fetch_user(vitima_id)
+
         await message.channel.send(
-            f"🔢 {mentioned_user.mention} ja cometeu {user_counters[str(user_id)]} teamkills! Escola Lozenilson de TK está orgulhosa!"
+            f"💥 {culpado_user.mention} deu TK em {vitima_user.mention}! "
+            f"Agora ele já tem {user_counters[str(culpado_id)]} teamkills! "
+            f"A Escola Lozenilson de TK está orgulhosa!"
         )
 
     await bot.process_commands(message)
+
 
 # COMANDO /CONTADOR
 

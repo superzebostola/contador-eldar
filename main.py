@@ -84,36 +84,50 @@ async def on_ready():
         print(f"Comandos de barra sincronizados: {len(synced)}")
     except Exception as e:
         print(f"Erro ao sincronizar comandos: {e}")
-
+# COMANDO TK
 @bot.event
 async def on_message(message):
     if message.author.bot:
         return
 
-    pattern = r"<@!?(\d+)>\s+tk"
-    matches = re.findall(pattern, message.content)
+    # @culpado tk @vitima
+    pattern = r"<@!?(\d+)>\s+tk\s+<@!?(\d+)>"
+    matches = re.findall(pattern, message.content, flags=re.IGNORECASE)
 
-    for user_id_str in matches:
-        user_id = int(user_id_str)
+    for culpado_id_str, vitima_id_str in matches:
+        culpado_id = str(culpado_id_str)
+        vitima_id = str(vitima_id_str)
 
-        if str(user_id) in user_counters:
-            user_counters[str(user_id)] += 1
-        else:
-            user_counters[str(user_id)] = 1
+        # Garante que as chaves existam no JSON
+        if "kills" not in user_counters:
+            user_counters["kills"] = {}
+        if "deaths" not in user_counters:
+            user_counters["deaths"] = {}
+
+        # Atualiza contador de TKs cometidos (culpado)
+        user_counters["kills"][culpado_id] = user_counters["kills"].get(culpado_id, 0) + 1
+
+        # Atualiza contador de TKs sofridos (vítima)
+        user_counters["deaths"][vitima_id] = user_counters["deaths"].get(vitima_id, 0) + 1
 
         save_data()
 
-        user = bot.get_user(user_id) or await bot.fetch_user(user_id)
+        culpado = bot.get_user(int(culpado_id)) or await bot.fetch_user(int(culpado_id))
+        vitima = bot.get_user(int(vitima_id)) or await bot.fetch_user(int(vitima_id))
+
         await message.channel.send(
-            f"🔢 {user.mention} já cometeu {user_counters[str(user_id)]} teamkills! Escola Lozenilson de TK está orgulhosa!"
+            f"💥 {culpado.mention} deu TK em {vitima.mention}!\n"
+            f"📊 Agora {culpado.mention} já tem {user_counters['kills'][culpado_id]} TK(s), "
+            f"e {vitima.mention} já sofreu {user_counters['deaths'][vitima_id]} TK(s)!"
         )
 
     await bot.process_commands(message)
 
-# HELP - lista todos os comandos
+
+# AJUDA - lista todos os comandos
 # ----------------------------------------
-@bot.tree.command(name="help", description="Mostra todos os comandos disponíveis.")
-async def help_command(interaction: discord.Interaction):
+@bot.tree.command(name="ajuda", description="Mostra todos os comandos disponíveis.")
+async def ajuda_command(interaction: discord.Interaction):
     embed = discord.Embed(
         title="📖 Lista de Comandos",
         description="Aqui estão os comandos disponíveis para o bot:",

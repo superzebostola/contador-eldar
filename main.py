@@ -38,8 +38,7 @@ creds = service_account.Credentials.from_service_account_info(
 drive_service = build("drive", "v3", credentials=creds)
 
 def upload_file(local_path=DATA_FILE):
-    def upload_file(local_path=DATA_FILE):
-    """Sobrescreve o arquivo no Google Drive"""
+       """Sobrescreve o arquivo no Google Drive"""
     try:
         media = MediaFileUpload(local_path, mimetype="application/json", resumable=True)
         drive_service.files().update(

@@ -38,13 +38,18 @@ creds = service_account.Credentials.from_service_account_info(
 drive_service = build("drive", "v3", credentials=creds)
 
 def upload_file(local_path=DATA_FILE):
+    def upload_file(local_path=DATA_FILE):
     """Sobrescreve o arquivo no Google Drive"""
-    media = MediaFileUpload(local_path, mimetype="application/json", resumable=True)
-    drive_service.files().update(
-        fileId=DRIVE_FILE_ID,
-        media_body=media,
-        body={"name": os.path.basename(local_path)}
-    ).execute()
+    try:
+        media = MediaFileUpload(local_path, mimetype="application/json", resumable=True)
+        drive_service.files().update(
+            fileId=DRIVE_FILE_ID,
+            media_body=media,
+            body={"name": os.path.basename(local_path)}
+        ).execute()
+        print("✅ Arquivo sobrescrito no Google Drive")
+    except Exception as e:
+        print(f"⚠️ Erro ao sobrescrever arquivo no Drive: {e}")
 
 
 def download_file(local_path=DATA_FILE):

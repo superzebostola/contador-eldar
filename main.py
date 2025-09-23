@@ -196,6 +196,14 @@ async def on_message(message):
 # ---------------- Slash Commands ----------------
 @bot.tree.command(name="ajuda", description="Mostra todos os comandos disponíveis.")
 async def ajuda_command(interaction: discord.Interaction):
+    # Texto explicando o comando TK
+    explicacao_tk = (
+        "📌 **Como usar o comando de TK:**\n"
+        "Digite no chat: `@culpado tk @vitima`\n"
+        "➡️ Exemplo: `@joao tk @mateus`\n\n"
+    )
+
+    # Embed com a lista de comandos
     embed = discord.Embed(
         title="📖 Lista de Comandos",
         description="Aqui estão os comandos disponíveis para o bot:",
@@ -216,7 +224,9 @@ async def ajuda_command(interaction: discord.Interaction):
         embed.add_field(name="/exportardata", value="📤 Exporta o arquivo data.json atual.", inline=False)
         embed.add_field(name="/importardata", value="📥 Importa e substitui o arquivo data.json.", inline=False)
 
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    # Envia primeiro a explicação e depois o embed
+    await interaction.response.send_message(explicacao_tk, ephemeral=True)
+    await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 

@@ -55,7 +55,6 @@ drive_service = build("drive", "v3", credentials=creds)
 def upload_file(local_path, file_id):
     """Sobrescreve o conteúdo de um arquivo no Google Drive"""
     try:
-        # Define o mimetype conforme o arquivo
         mimetype = "application/json" if local_path.endswith(".json") else "text/plain"
         media = MediaFileUpload(local_path, mimetype=mimetype, resumable=False)
         drive_service.files().update(
@@ -81,12 +80,11 @@ def download_file(local_path, file_id):
         logging.error(f"⚠️ Erro ao baixar {local_path} do Drive: {e}")
 
 
-
 # ---------------- Funções de salvar/carregar ----------------
 def load_data():
     try:
-        download_file(DATA_FILE)
-        with open(DATA_FILE, "r") as f:
+        download_file(DATA_FILE, DRIVE_FILE_ID)
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
         logging.error(f"⚠️ Erro ao carregar dados do Drive: {e}")
@@ -98,28 +96,25 @@ def save_data():
         json.dump(user_counters, f, indent=4, ensure_ascii=False)
     try:
         upload_file(DATA_FILE, DRIVE_FILE_ID)
-        upload_file(LOG_FILE, DRIVE_LOGS_ID)  # <-- aqui envia os logs junto
+        upload_file(LOG_FILE, DRIVE_LOGS_ID)  # também envia logs
     except Exception as e:
         logging.error(f"⚠️ Erro ao salvar arquivos no Drive: {e}")
 
 
 # -------------------------------------------------------------
-
 @bot.event
 async def on_ready():
-      global user_counters
+    global user_counters
     user_counters = load_data()
-    logger.info(f"✅ Bot conectado como {bot.user}")
-    save_logs()  # <-- adiciona aqui
+    logging.info(f"✅ Bot conectado como {bot.user}")
     try:
         synced = await bot.tree.sync()
-        logger.info(f"Comandos de barra sincronizados: {len(synced)}")
+        logging.info(f"Comandos de barra sincronizados: {len(synced)}")
     except Exception as e:
-        logger.error(f"Erro ao sincronizar comandos: {e}")
+        logging.error(f"Erro ao sincronizar comandos: {e}")
 
 
-
-# COMANDO TK
+# ---------------- Eventos ----------------
 @bot.event
 async def on_message(message):
     if message.author.bot:
@@ -276,7 +271,6 @@ async def exportarlogs(interaction: discord.Interaction):
 
 
 # ----------------------------------------------------
-
 bot_token = os.getenv("DISCORD_BOT_TOKEN")
 if bot_token:
     keep_alive()

@@ -38,12 +38,14 @@ creds = service_account.Credentials.from_service_account_info(
 drive_service = build("drive", "v3", credentials=creds)
 
 def upload_file(local_path=DATA_FILE):
-    """Envia o arquivo local para o Google Drive"""
+    """Sobrescreve o arquivo no Google Drive"""
     media = MediaFileUpload(local_path, mimetype="application/json", resumable=True)
     drive_service.files().update(
         fileId=DRIVE_FILE_ID,
-        media_body=media
+        media_body=media,
+        body={"name": os.path.basename(local_path)}
     ).execute()
+
 
 def download_file(local_path=DATA_FILE):
     """Baixa o arquivo do Google Drive"""

@@ -21,26 +21,48 @@ user_counters = {}
 # ---------------- Funções de salvar/carregar ----------------
 def load_data():
     if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r") as f:
-            return json.load(f)
-    return {}
+        try:
+            with open(DATA_FILE, "r") as f:
+                data = json.load(f)
+                if isinstance(data, dict) and data:  # garante que é dict e não está vazio
+                    return data
+        except Exception as e:
+            print(f"⚠️ Erro ao carregar data.json: {e}")
+    return {}  # retorna vazio se não houver dados válidos
+
 
 def save_data():
-    with open(DATA_FILE, "w") as f:
-        json.dump(user_counters, f, indent=4)
+    # Só salva se houver dados no dicionário
+    if user_counters:
+        with open(DATA_FILE, "w") as f:
+            json.dump(user_counters, f, indent=4)
+        print("💾 Dados salvos em data.json")
+    else:
+        print("⚠️ Nenhum dado para salvar, não sobrescrevendo data.json")
 # -------------------------------------------------------------
+
 
 @bot.event
 async def on_ready():
     global user_counters
-    user_counters = load_data()
-    print(f"Bot conectado como {bot.user}")
+    loaded_data = load_data()
+    if loaded_data:  # só substitui se houver dados válidos
+        user_counters = loaded_data
+        print("✅ Dados carregados do data.json")
+    else:
+        print("⚠️ Nenhum dado válido encontrado em data.json (mantendo contador vazio).")
+
+    print(f"🤖 Bot conectado como {bot.user}")
     try:
         synced = await bot.tree.sync()
-        print(f"Comandos de barra sincronizados: {len(synced)}")
+        print(f"📌 Comandos de barra sincronizados: {len(synced)}")
     except Exception as e:
-        print(f"Erro ao sincronizar comandos: {e}")
+        print(f"❌ Erro ao sincronizar comandos: {e}")
 
+
+#------------COMANDOS
+
+#COMANDO TK
 @bot.event
 async def on_message(message):
     if message.author.bot:
@@ -66,7 +88,7 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-# ---------------- Comandos de barra ----------------
+# COMANDO /CONTADOR
 
 # Ver contador de 1 usuário
 @bot.tree.command(name="contador", description="Veja quantos teamkills um usuário cometeu.")
@@ -77,7 +99,7 @@ async def contador(interaction: discord.Interaction, usuario: discord.User):
         f"📊 {usuario.mention} tem atualmente {count} teamkills(s)."
     )
 
-# Ver o próprio contador
+#COMANDO /MEUCONTADOR
 @bot.tree.command(name="meucontador", description="Veja quantos teamkills você já cometeu.")
 async def meucontador(interaction: discord.Interaction):
     count = user_counters.get(str(interaction.user.id), 0)
@@ -85,7 +107,7 @@ async def meucontador(interaction: discord.Interaction):
         f"🙋 {interaction.user.mention}, você tem atualmente {count} tk(s)."
     )
 
-# Mostrar ranking
+#COMANDO /TOP
 @bot.tree.command(name="top", description="Mostra o ranking de usuários com mais teamkills do esquadrão.")
 async def top(interaction: discord.Interaction):
     if not user_counters:
@@ -101,11 +123,11 @@ async def top(interaction: discord.Interaction):
 
     await interaction.response.send_message(top_text)
 
-# Resetar contador de um usuário (somente admins)
-@bot.tree.command(name="reset", description="Reseta o contador de um usuário (apenas admins).")
+#COMANDO /ZERAR
+@bot.tree.command(name="zerar", description="Reseta o contador de um usuário (apenas admins).")
 @app_commands.describe(usuario="Usuário que você quer resetar")
 @app_commands.default_permissions(administrator=True)
-async def reset(interaction: discord.Interaction, usuario: discord.User):
+async def zerar(interaction: discord.Interaction, usuario: discord.User):
     # Additional runtime check as fallback
     if not isinstance(interaction.user, discord.Member) or not interaction.user.guild_permissions.administrator:
         await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
@@ -115,7 +137,7 @@ async def reset(interaction: discord.Interaction, usuario: discord.User):
     save_data()
     await interaction.response.send_message(f"🔄 O contador de {usuario.mention} foi resetado para 0.")
 
-# ----------------------------------------------------
+# TOKEN DISCORD
 
 # Use environment variable for the token
 bot_token = os.getenv("DISCORD_BOT_TOKEN")

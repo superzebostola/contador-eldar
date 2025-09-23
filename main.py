@@ -83,22 +83,35 @@ def download_file(local_path, file_id):
 # ---------------- Funções de salvar/carregar ----------------
 def load_data():
     try:
+        # Baixa a versão mais recente do Drive
         download_file(DATA_FILE, DRIVE_FILE_ID)
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+
+        # Só carrega se o arquivo não estiver vazio
+        if os.path.exists(DATA_FILE) and os.path.getsize(DATA_FILE) > 0:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        else:
+            logging.warning("⚠️ data.json vazio ou inexistente, iniciando novo contador.")
+            return {}
     except Exception as e:
         logging.error(f"⚠️ Erro ao carregar dados do Drive: {e}")
         return {}
 
 
 def save_data():
+    if not user_counters:
+        logging.warning("⚠️ Dados vazios detectados, não sobrescrevendo o Drive.")
+        return
+
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(user_counters, f, indent=4, ensure_ascii=False)
+
     try:
         upload_file(DATA_FILE, DRIVE_FILE_ID)
-        upload_file(LOG_FILE, DRIVE_LOGS_ID)  # também envia logs
+        upload_file(LOG_FILE, DRIVE_LOGS_ID)
     except Exception as e:
         logging.error(f"⚠️ Erro ao salvar arquivos no Drive: {e}")
+
 
 
 # -------------------------------------------------------------

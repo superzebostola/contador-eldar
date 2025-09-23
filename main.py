@@ -172,13 +172,23 @@ async def ajuda_command(interaction: discord.Interaction):
         description="Aqui estão os comandos disponíveis para o bot:",
         color=discord.Color.blue()
     )
+
+    # Comandos gerais (todos veem)
     embed.add_field(name="/contador [usuário]", value="📊 Mostra quantos teamkills um usuário já cometeu.", inline=False)
     embed.add_field(name="/meucontador", value="🙋 Mostra quantos teamkills você mesmo já cometeu.", inline=False)
     embed.add_field(name="/top", value="🏆 Mostra o ranking dos 10 usuários com mais teamkills.", inline=False)
-    embed.add_field(name="/zerar [usuário] (admin)", value="🔄 Zera o contador de um usuário.", inline=False)
-    embed.add_field(name="/remover [usuário] (admin)", value="➖ Diminui em 1 o contador de um usuário.", inline=False)
-    embed.add_field(name="/exportarlogs", value="📂 Exporta o arquivo de log do bot.", inline=False)
-    await interaction.response.send_message(embed=embed)
+
+    # Se o usuário for admin, adiciona os comandos de administração
+    if isinstance(interaction.user, discord.Member) and interaction.user.guild_permissions.administrator:
+        embed.add_field(name="⠀", value="**⚙️ Comandos de Administração:**", inline=False)
+        embed.add_field(name="/zerar [usuário]", value="🔄 Zera o contador de um usuário.", inline=False)
+        embed.add_field(name="/remover [usuário]", value="➖ Diminui em 1 o contador de um usuário.", inline=False)
+        embed.add_field(name="/exportarlogs", value="📂 Exporta o arquivo de log do bot.", inline=False)
+        embed.add_field(name="/exportardata", value="📤 Exporta o arquivo data.json atual.", inline=False)
+        embed.add_field(name="/importardata", value="📥 Importa e substitui o arquivo data.json.", inline=False)
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 
 @bot.tree.command(name="contador", description="Veja quantos teamkills um usuário cometeu e sofreu.")
@@ -283,6 +293,55 @@ async def exportarlogs(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("❌ Nenhum log encontrado.", ephemeral=True)
 
+# ---------------- Admin Commands: Import/Export data.json ----------------
+
+@bot.tree.command(name="exportardata", description="Exporta o arquivo data.json (apenas admins).")
+@app_commands.default_permissions(administrator=True)
+async def exportardata(interaction: discord.Interaction):
+    try:
+        # Baixa a versão mais recente do Drive antes de exportar
+        try:
+            download_file(DATA_FILE, DRIVE_FILE_ID)
+        except Exception as e:
+            logging.warning(f"⚠️ Não foi possível atualizar data.json do Drive: {e}")
+
+        if os.path.exists(DATA_FILE):
+            await interaction.response.send_message(
+                file=discord.File(DATA_FILE),
+                ephemeral=True
+            )
+        else:
+            await interaction.response.send_message("❌ Nenhum data.json encontrado.", ephemeral=True)
+    except Exception as e:
+        logging.error(f"Erro ao exportar data.json: {e}")
+        await interaction.response.send_message("❌ Erro ao exportar data.json.", ephemeral=True)
+
+
+@bot.tree.command(name="importardata", description="Importa e substitui o arquivo data.json (apenas admins).")
+@app_commands.default_permissions(administrator=True)
+async def importardata(interaction: discord.Interaction, arquivo: discord.Attachment):
+    if not arquivo.filename.endswith(".json"):
+        await interaction.response.send_message("❌ O arquivo precisa ser um .json válido.", ephemeral=True)
+        return
+
+    try:
+        # Baixa o arquivo enviado pelo admin
+        file_bytes = await arquivo.read()
+        with open(DATA_FILE, "wb") as f:
+            f.write(file_bytes)
+
+        # Atualiza memória
+        global user_counters
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            user_counters = json.load(f)
+
+        # Envia pro Drive
+        save_data()
+
+        await interaction.response.send_message("✅ data.json importado e atualizado com sucesso!", ephemeral=True)
+    except Exception as e:
+        logging.error(f"Erro ao importar data.json: {e}")
+        await interaction.response.send_message("❌ Erro ao importar data.json.", ephemeral=True)
 
 # ----------------------------------------------------
 bot_token = os.getenv("DISCORD_BOT_TOKEN")

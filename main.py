@@ -143,37 +143,53 @@ async def ajuda_command(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 # ---------------- Comandos de barra ----------------
-
-@bot.tree.command(name="contador", description="Veja quantos teamkills um usuário cometeu.")
+# comando /contador
+@bot.tree.command(name="contador", description="Veja quantos teamkills um usuário cometeu e sofreu.")
 @app_commands.describe(usuario="Usuário que você quer ver o contador")
 async def contador(interaction: discord.Interaction, usuario: discord.User):
-    count = user_counters.get(str(usuario.id), 0)
+    kills = user_counters.get("kills", {}).get(str(usuario.id), 0)
+    deaths = user_counters.get("deaths", {}).get(str(usuario.id), 0)
     await interaction.response.send_message(
-        f"📊 {usuario.mention} tem atualmente {count} teamkill(s)."
+        f"📊 {usuario.mention} já cometeu **{kills} TK(s)** e sofreu **{deaths} TK(s)**."
     )
-
-@bot.tree.command(name="meucontador", description="Veja quantos teamkills você já cometeu.")
+# comando /meucontador
+@bot.tree.command(name="meucontador", description="Veja quantos teamkills você já cometeu e sofreu.")
 async def meucontador(interaction: discord.Interaction):
-    count = user_counters.get(str(interaction.user.id), 0)
+    user_id = str(interaction.user.id)
+    kills = user_counters.get("kills", {}).get(user_id, 0)
+    deaths = user_counters.get("deaths", {}).get(user_id, 0)
     await interaction.response.send_message(
-        f"🙋 {interaction.user.mention}, você tem atualmente {count} tk(s)."
+        f"🙋 {interaction.user.mention}, você já cometeu **{kills} TK(s)** e sofreu **{deaths} TK(s)**."
     )
-
-@bot.tree.command(name="top", description="Mostra o ranking de usuários com mais teamkills do esquadrão.")
+# comando /top
+@bot.tree.command(name="top", description="Mostra o ranking de usuários com mais TKs cometidos e sofridos.")
 async def top(interaction: discord.Interaction):
-    if not user_counters:
+    if not user_counters or ("kills" not in user_counters and "deaths" not in user_counters):
         await interaction.response.send_message("❌ Ainda não há contadores registrados.")
         return
 
-    ranking = sorted(user_counters.items(), key=lambda x: x[1], reverse=True)
     top_text = "🏆 **Ranking de Teamkills ELDAR**:\n\n"
 
-    for i, (user_id, count) in enumerate(ranking[:10], start=1):
-        user = bot.get_user(int(user_id)) or await bot.fetch_user(int(user_id))
-        top_text += f"**{i}.** {user.mention} — {count} teamkill(s)\n"
+    # Ranking de quem mais matou
+    kills_sorted = sorted(user_counters.get("kills", {}).items(), key=lambda x: x[1], reverse=True)
+    if kills_sorted:
+        top_text += "**🔪 TOP 5 TKs Cometidos:**\n"
+        for i, (user_id, count) in enumerate(kills_sorted[:5], start=1):
+            user = bot.get_user(int(user_id)) or await bot.fetch_user(int(user_id))
+            top_text += f"**{i}.** {user.mention} — {count} TK(s)\n"
+        top_text += "\n"
+
+    # Ranking de quem mais morreu
+    deaths_sorted = sorted(user_counters.get("deaths", {}).items(), key=lambda x: x[1], reverse=True)
+    if deaths_sorted:
+        top_text += "**☠️ TOP 5 TKs Sofridos:**\n"
+        for i, (user_id, count) in enumerate(deaths_sorted[:5], start=1):
+            user = bot.get_user(int(user_id)) or await bot.fetch_user(int(user_id))
+            top_text += f"**{i}.** {user.mention} — {count} TK(s)\n"
 
     await interaction.response.send_message(top_text)
 
+# comando /zerar
 @bot.tree.command(name="zerar", description="Reseta o contador de um usuário (apenas admins).")
 @app_commands.describe(usuario="Usuário que você quer resetar")
 @app_commands.default_permissions(administrator=True)
@@ -185,7 +201,7 @@ async def zerar(interaction: discord.Interaction, usuario: discord.User):
     user_counters[str(usuario.id)] = 0
     save_data()
     await interaction.response.send_message(f"🔄 O contador de {usuario.mention} foi resetado para 0.")
-
+# comando /remover
 @bot.tree.command(name="remover", description="Diminui em 1 o contador de um usuário (apenas admins).")
 @app_commands.describe(usuario="Usuário que você quer diminuir o contador")
 @app_commands.default_permissions(administrator=True)

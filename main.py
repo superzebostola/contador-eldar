@@ -309,7 +309,7 @@ async def remover(interaction: discord.Interaction, usuario: discord.User):
             f"⚠️ O contador de {usuario.display_name} já está em 0 e não pode ser diminuído."
         )
 
-        )
+        
 
 
 #COMANDO /EXPORTARLOGS

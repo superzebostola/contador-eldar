@@ -205,9 +205,20 @@ async def zerar(interaction: discord.Interaction, usuario: discord.User):
         await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
         return
 
-    user_counters[str(usuario.id)] = 0
+    user_id = str(usuario.id)
+
+    # Garante que as chaves existam
+    if "kills" not in user_counters:
+        user_counters["kills"] = {}
+    if "deaths" not in user_counters:
+        user_counters["deaths"] = {}
+
+    user_counters["kills"][user_id] = 0
+    user_counters["deaths"][user_id] = 0
+
     save_data()
     await interaction.response.send_message(f"🔄 O contador de {usuario.mention} foi resetado para 0.")
+
 # comando /remover
 @bot.tree.command(name="remover", description="Diminui em 1 o contador de um usuário (apenas admins).")
 @app_commands.describe(usuario="Usuário que você quer diminuir o contador")
@@ -218,12 +229,21 @@ async def remover(interaction: discord.Interaction, usuario: discord.User):
         return
 
     user_id = str(usuario.id)
-    if user_id in user_counters and user_counters[user_id] > 0:
-        user_counters[user_id] -= 1
+
+    if "kills" not in user_counters:
+        user_counters["kills"] = {}
+
+    if user_id in user_counters["kills"] and user_counters["kills"][user_id] > 0:
+        user_counters["kills"][user_id] -= 1
         save_data()
-        await interaction.response.send_message(f"➖ O contador de {usuario.mention} foi diminuído para {user_counters[user_id]}.")
+        await interaction.response.send_message(
+            f"➖ O contador de {usuario.mention} foi diminuído para {user_counters['kills'][user_id]}."
+        )
     else:
-        await interaction.response.send_message(f"⚠️ O contador de {usuario.mention} já está em 0 e não pode ser diminuído.")
+        await interaction.response.send_message(
+            f"⚠️ O contador de {usuario.mention} já está em 0 e não pode ser diminuído."
+        )
+
 
 # ----------------------------------------------------
 

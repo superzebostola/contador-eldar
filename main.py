@@ -47,7 +47,8 @@ if not GOOGLE_CREDENTIALS or not DRIVE_FILE_ID or not DRIVE_LOGS_ID:
 
 creds = service_account.Credentials.from_service_account_info(
     json.loads(GOOGLE_CREDENTIALS),
-    scopes=["https://www.googleapis.com/auth/drive.file"]
+    scopes=["https://www.googleapis.com/auth/drive"]
+
 )
 drive_service = build("drive", "v3", credentials=creds)
 

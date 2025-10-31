@@ -420,7 +420,14 @@ async def importardata(interaction: discord.Interaction, arquivo: discord.Attach
 # ----------------------------------------------------
 bot_token = os.getenv("DISCORD_BOT_TOKEN")
 if bot_token:
-    keep_alive()
-    bot.run(bot_token)
+    keep_alive()  # mantém o servidor web ativo (Replit/UptimeRobot)
+    while True:
+        try:
+            bot.run(bot_token)
+        except Exception as e:
+            print(f"⚠️ Erro no bot: {e}")
+            import time
+            time.sleep(5)
+            print("🔁 Reiniciando o bot...")
 else:
-    logging.error("❌ DISCORD_BOT_TOKEN não encontrado nas variáveis de ambiente.")
+    print("❌ DISCORD_BOT_TOKEN não encontrado nas variáveis de ambiente.")
